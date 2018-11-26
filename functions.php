@@ -34,6 +34,14 @@ function msp_enqueue_scripts(){
   wp_enqueue_script( 'script', plugin_dir_url( __FILE__ ) . '/main.js', array( 'jquery' ), rand(1, 1000) );
 }
 
+if( ! function_exists( 'pre_dump' ) ){
+	function pre_dump( $arr ){
+	  echo '<pre>';
+	  var_dump( $arr );
+	  echo '<pre>';
+	}
+}
+
 function msp_register_settings(){
   register_setting( 'msp_shipping_creds', 'msp_ups_api_key' );
   register_setting( 'msp_shipping_creds', 'msp_ups_user_name' );
@@ -398,7 +406,7 @@ if( ! function_exists( 'msp_confirm_return' ) ){
   *
   */
   function msp_confirm_return(){
-    // pre_dump( $_POST );
+    pre_dump( $_POST );
     $order = wc_get_order( $_POST['order_id'] );
     if( $order ){
       $returns = array(
@@ -449,6 +457,8 @@ if( ! function_exists( 'msp_shipment_confirm_request' ) ){
 
 	}
 }
+
+
 
 if( ! function_exists( 'msp_shipment_accept_request' ) ){
   /**
@@ -883,16 +893,19 @@ function msp_view_return_button( $return ){
 
 function msp_get_return_button( $order_id ){
 	$order = wc_get_order( $order_id );
-	$delivered = $order->get_date_completed()->modify( '+5 days' );
-	$return_by = $delivered->modify( '+' . get_option( 'msp_return_by' ) . ' days' );
+	if( $order->get_status( 'completed' ) ){
+		$delivered = $order->get_date_completed()->modify( '+5 days' );
+		$return_by = $delivered->modify( '+' . get_option( 'msp_return_by' ) . ' days' );
 
-	$today = new DateTime();
-	if( $today <= $return_by ){
-		$email = $order->get_billing_email();
-		$link = get_site_url( ) . '/returns?id='. $order_id . '&email=' . $email;
-		$return_btn = '<a href="'. $link .'" class="woocommerce-button button">Return</a>';
-		echo $return_btn;
+		$today = new DateTime();
+		if( $today <= $return_by ){
+			$email = $order->get_billing_email();
+			$link = get_site_url( ) . '/returns?id='. $order_id . '&email=' . $email;
+			$return_btn = '<a href="'. $link .'" class="woocommerce-button button">Return</a>';
+			echo $return_btn;
+		}
 	}
+
 }
 
 add_action( 'admin_menu', 'sc_setup_shipping_integration' );
