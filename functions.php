@@ -1,6 +1,6 @@
 <?php
 /*
-Plugin Name: MSP Shipping Integration
+Plugin Name: MSP Shipping
 Description: Allows for a website to connect with shipping API's
 Version: 1.0
 Author: Gregory Bastianelli
@@ -904,7 +904,7 @@ if( ! function_exists( 'sc_setup_shipping_integration' ) ){
   *
   */
   function sc_setup_shipping_integration(){
-    add_plugins_page( 'MSP Shipping Integration', 'MSP Shipping Integration', 'administrator', 'msp_ship_menu', 'msp_ship_menu_html' );
+    add_plugins_page( 'MSP Shipping', 'MSP Shipping', 'administrator', 'msp_ship_menu', 'msp_ship_menu_html' );
   }
 }
 
