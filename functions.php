@@ -2,7 +2,7 @@
 /*
 Plugin Name: MSP Shipping Integration
 Description: Allows for a website to connect with shipping API's
-Version: 0.1.0
+Version: 1.0
 Author: Gregory Bastianelli
 Author URI: http://drunk.kiwi
 Text Domain: msp-shipping

@@ -1,1 +1,1 @@
-# sc_shipping_api_itegration
+# Michigan Safety Products Shipping Plugin
