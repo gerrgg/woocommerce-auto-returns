@@ -886,9 +886,10 @@ if( ! function_exists( 'sc_return_item_html' ) ){
 }
 
 function msp_view_return_button( $return ){
-	$link = get_site_url( ) . '/returns?return_id=' . $return->get_id();
+	// $link = get_site_url( ) . '/returns?return_id=' . $return->get_id();
 	// TODO: allow user to edit and recover label;
-	echo '<a href="'. $link .'" class="woocommerce-button button">View Return Request</a>';
+	// echo '<a href="'. $link .'" class="woocommerce-button button">View Return Request</a>';
+	// echo 'Return #' . $return->get_id();
 }
 
 function msp_get_return_button( $order_id ){
