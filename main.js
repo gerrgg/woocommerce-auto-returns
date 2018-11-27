@@ -10,6 +10,7 @@ jQuery(document).ready(function( $ ){
     var $image = $(this).find('div').find('div.return-product-img');
     var $form = $('.' + id + '_hidden-return-form' );
     var src = $image.find( 'img' ).attr('src');
+    var type = $(this).attr('data-product-type');
 
     // allows form to easily pop in and out;
     // TODO: Add logic to allow for exhanges!
@@ -30,7 +31,7 @@ jQuery(document).ready(function( $ ){
                               name: id + '[how_many]',
                               value: qty
                             } );
-        $form.append( create_return_reason_form( id ), hidden_awnser );
+        $form.append( create_return_reason_form( id, type ), hidden_awnser );
       }
 
 
@@ -38,7 +39,7 @@ jQuery(document).ready(function( $ ){
       $('.return-all-radio').change(function(){
         var awnser = this.value;
         if( awnser == 'yes' ){
-          if( ! $( '#' + id + '_reason_form' ).length ) $form.append( create_return_reason_form( id ) );
+          if( ! $( '#' + id + '_reason_form' ).length ) $form.append( create_return_reason_form( id, type ) );
           // if they say yes, then create a hidden input with value of the order qty
           var hidden_awnser = $('<input/>', {
                                 type: 'hidden',
@@ -53,6 +54,7 @@ jQuery(document).ready(function( $ ){
           $form.append( create_how_many_form( id ) );
           $('#' + id + '_reason_form').remove();
           $('#' + id + '_how_many_hidden').remove();
+          $('#' + id + '_exchange_form').remove();
         }
       });
 
@@ -60,7 +62,7 @@ jQuery(document).ready(function( $ ){
         var given_qty = this.value;
         ( given_qty > qty ) ? $(this).val( qty ) : $('#' + id + '_return_quantity').html( given_qty );
         // if already exists in DOM, do not make.
-        if( ! $( '#' + id + '_reason_form' ).length && given_qty != '' ) $form.append( create_return_reason_form( id ) );
+        if( ! $( '#' + id + '_reason_form' ).length && given_qty != '' ) $form.append( create_return_reason_form( id, type ) );
       } );
 
       $form.on( 'change', '#' + id + '_reason_select', function(){
@@ -68,22 +70,79 @@ jQuery(document).ready(function( $ ){
         if( awnser.length > 0 && awnser != 'Please select a reason for return' ){
           $('#' + id + '_return_reason').html( awnser );
         }
+        if( awnser == 'I\'d like to make an exchange' && ! $('#' + id + '_exchange_form').length ){
+          $form.append( create_exchange_form( id, qty ) );
+        } else {
+          $('#' + id + '_exchange_form').remove();
+        }
+      } );
+
+      $form.on( 'blur', '.exchange_for', function(){
+        var total = 0;
+        $('.exchange_for').each(function(i, obj){
+          total += Math.abs(Number(obj.value))
+        });
+        if( total > qty ){
+          $(this).val( 0 );
+        }
+        // $('#exchange_header span').html( total + '/' + qty );
       } );
 
     } else {
       $form.removeClass( 'show' );
       $image.attr( 'aria-checked', 'false' );
-      $item_confirm_box.remove();
+      $('#' + id + '_confirm_box').remove();
       $form.html('');
       $('#' + id + '_ready').remove();
-
     }
 
   });
 
+  function create_exchange_form( id, qty ){
+    // variations = get_item_variations( id );
+
+    $exchange_form = $('<div/>', {
+      id: id + '_exchange_form',
+      class: 'form-group exchange_form',
+    });
+    // $table = $('<table/>', {
+    //   id: id + '_variation_table',
+    //   class: 'table'
+    // });
+    // $.each(variations, function(){
+    //   if( this.id != id && this.stock != 0 ){
+    //     $table.append( $('<tr/>').append( '<td>' + this.title + '</td>', '<td><input class="exchange_for" type="tel" name="'+id+'[exchange_for]['+this.id+']/>"</td>' ) );
+    //   }
+    // });
+
+    $exchange_form.append( '<h4 id="exchange_header">Call <a style="color: red;" href="tel:1-888-723-3864">888-723-3864</a> to make an exchange.</h4>' );
+    return $exchange_form;
+  }
+
+  function get_item_variations( id ){
+    var data = {
+      'action': 'get_variations_for_js',
+      'id'    : id
+    }
+    var text = '';
+
+    $.ajax({
+      type: 'POST',
+      url: ajax_object.ajax_url,
+      data: data,
+      async: false,
+      success: function( response ){
+        text = response;
+      }
+    });
+
+    return JSON.parse(text);
+
+  }
+
     $check.click(function(){
       var checked = this.checked;
-      console.log( $confirm_box.text().length );
+      // console.log( $confirm_box.text().length );
       if ( $confirm_box.text().length ){
         (checked) ? $submit.prop('disabled', false ) : $submit.prop('disabled', true );
       }
@@ -102,6 +161,7 @@ jQuery(document).ready(function( $ ){
     $awnser_box = $( '<div/>' );
     $qty_box = create_label_awnser( id, 'quantity' );
     $reason_box = create_label_awnser( id, 'reason' );
+    $exchange_box = create_label_awnser( id, 'exchange' );
 
     $awnser_box.append( $qty_box, $reason_box );
 
@@ -123,17 +183,17 @@ jQuery(document).ready(function( $ ){
     return string.charAt(0).toUpperCase() + string.slice(1);
   }
 
-  function create_return_reason_form( id ){
+  function create_return_reason_form( id, type ){
     var $reason_form = $( '<div/>', {
       id: id + '_reason_form',
       class: 'form-group'
     } );
-    var $select = create_return_reason_select( id );
+    var $select = create_return_reason_select( id, type );
     $reason_form.append( '<h4>Why are your returning this item?</h4>', $select );
     return $reason_form;
   }
 
-  function create_return_reason_select( id ){
+  function create_return_reason_select( id, type ){
     var reasons = [
       'Please select a reason for return',
       'No longer needed',
@@ -148,6 +208,8 @@ jQuery(document).ready(function( $ ){
       'Received an extra item ( No refund needed )',
       'Didnt approve purchase'
     ];
+
+    if( type == 'variation' ) reasons.splice( 1, 0, 'I\'d like to make an exchange' );
 
     var $select = $( '<select/>', {
       id: id + '_reason_select',

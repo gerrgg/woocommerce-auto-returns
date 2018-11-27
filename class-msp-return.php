@@ -24,7 +24,7 @@ class MSP_Return{
 
   protected function get_data( $id ){
     global $wpdb;
-    $row = $wpdb->get_row( "SELECT * FROM $wpdb->prefix" . "msp_return" . " WHERE order_id = " . $id );
+    $row = $wpdb->get_row( "SELECT * FROM $wpdb->prefix" . "msp_return" . " WHERE order_id = " . $id . " OR id = " . $id );
     if ( ! empty( $row ) ) return $row;
   }
 
@@ -49,8 +49,12 @@ class MSP_Return{
     return $this->data->order_id;
   }
 
+  public function get_type(){
+    return $this->data->type;
+  }
+
   public function get_cost(){
-    return $this->data->cost;
+    return '$' . $this->data->shipment_cost;
   }
 
   public function get_billing_weight(){
@@ -59,6 +63,10 @@ class MSP_Return{
 
   public function get_tracking(){
     return $this->data->tracking;
+  }
+
+  public function get_created(){
+    return $this->data->created;
   }
 
   public function set($insert){

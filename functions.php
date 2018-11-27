@@ -32,6 +32,7 @@ add_filter( 'wp_mail_content_type', 'wpdocs_set_html_mail_content_type' );
 function msp_enqueue_scripts(){
   wp_enqueue_style( 'style', plugin_dir_url( __FILE__ ) . '/style.css', false, rand(1, 1000), 'all' );
   wp_enqueue_script( 'script', plugin_dir_url( __FILE__ ) . '/main.js', array( 'jquery' ), rand(1, 1000) );
+	wp_localize_script( 'script', 'ajax_object', array( 'ajax_url' => admin_url( 'admin-ajax.php' ) ) );
 }
 
 if( ! function_exists( 'pre_dump' ) ){
@@ -40,6 +41,35 @@ if( ! function_exists( 'pre_dump' ) ){
 	  var_dump( $arr );
 	  echo '<pre>';
 	}
+}
+add_action( 'wp_ajax_get_variations_for_js', 'get_variations_for_js' );
+function get_variations_for_js(){
+	$variations = array();
+
+	$product = wc_get_product( $_POST['id'] );
+	if( ! $product ) return 'Not a product';
+
+	$parent = wc_get_product( $product->get_parent_id() );
+	if( ! $parent ) return 'Not a child';
+
+	$children = $parent->get_children();
+	if( ! $children ) return 'Has no children';
+
+	foreach( $children as $child_id ){
+		if( $child_id != $_POST['id'] ){
+			$child = wc_get_product( $child_id );
+			array_push( $variations, array(
+				'id'		=> $child_id,
+				'title' => $child->get_name(),
+				'price' => $child->get_price(),
+				'sku' => $child->get_sku(),
+				'stock' => $child->get_stock_quantity(),
+			) );
+		}
+	}
+
+	echo json_encode( $variations );
+	wp_die();
 }
 
 function msp_register_settings(){
@@ -340,9 +370,36 @@ if( ! function_exists( 'msp_return_form_dispatcher' ) ){
   *
   */
   function msp_return_form_dispatcher(){
+		if( is_user_logged_in() && ! isset( $_GET['return_id'] ) ) wp_redirect('/my-account/orders/');
     if( isset( $_GET['id'], $_GET['email'] ) ){
       msp_validate_user( $_GET['id'], $_GET['email'] );
-    } else {
+    } else if( isset( $_GET['return_id'] ) ){
+			$return = new MSP_Return( $_GET['return_id'] );
+			?>
+			<div class="col-12 text-center">
+				<table>
+					<thead>
+						<th>RMA #</th>
+						<th>Order #</th>
+						<th>Type</th>
+						<th>Shipment Cost</th>
+						<th>Billing Weight</th>
+						<th>Tracking #</th>
+						<th>Label Created</th>
+					</thead>
+					<tbody>
+						<td><?php echo $return->get_id(); ?></td>
+						<td><?php echo $return->geT_order_id(); ?></td>
+						<td><?php echo $return->get_type(); ?></td>
+						<td><?php echo $return->get_cost(); ?></td>
+						<td><?php echo $return->get_billing_weight(); ?></td>
+						<td><?php echo $return->get_tracking(); ?></td>
+						<td><?php echo $return->get_created(); ?></td>
+					</tbody>
+				</table>
+			</div>
+			<?php
+		} else {
       msp_non_valid_user_return_form();
     }
   }
@@ -406,12 +463,13 @@ if( ! function_exists( 'msp_confirm_return' ) ){
   *
   */
   function msp_confirm_return(){
-    pre_dump( $_POST );
+    // pre_dump( $_POST );
     $order = wc_get_order( $_POST['order_id'] );
     if( $order ){
       $returns = array(
         'name'  => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
         'email' => $order->get_billing_email(),
+				'phone' => $order->get_billing_phone(),
         'order' => $order->get_id(),
       );
       foreach( $_POST as $key => $item ){
@@ -429,7 +487,10 @@ if( ! function_exists( 'msp_confirm_return' ) ){
           }
         }
       }
-
+			msp_create_return_email( $returns, array(
+				'to' => 'greg@'.get_bloginfo('name').'.com',
+				'subject' => $returns['name'] . ' wants to make a return',
+			) );
 			msp_shipment_confirm_request( $returns );
     }
   }
@@ -451,7 +512,7 @@ if( ! function_exists( 'msp_shipment_confirm_request' ) ){
 		if( $response['Response']['ResponseStatusCode'] ){
 			msp_shipment_accept_request( $response, $data );
 		} else {
-			pre_dump( $response );
+			// pre_dump( $response );
 			return $response['Response']['ResponseStatusDescription'];
 		}
 
@@ -473,9 +534,9 @@ if( ! function_exists( 'msp_shipment_accept_request' ) ){
 		$response = sc_get_xml_by_curl( 'https://'. get_option( 'msp_ups_test_mode' ) .'.ups.com/ups.app/xml/ShipAccept', $xml );
 
 		if( $response['Response']['ResponseStatusCode'] ){
-			pre_dump( $response );
+			// pre_dump( $response );
 			msp_set_return( $response, $data );
-			// wp_redirect( '/' );
+			wp_redirect( '/my-account/orders/' );
 		} else {
 			return $response['Response']['ResponseStatusDescription'];
 		}
@@ -685,7 +746,7 @@ if( ! function_exists( 'msp_ups_create_shipment' ) ){
 		if( ! empty($order->get_billing_company() ) ){
 			$shipment->ShipFrom->addChild( 'CompanyName', $order->get_billing_company() );
 		} else {
-			$shipment->ShipFrom->addChild( 'CompanyName', get_option( 'msp_ups_shipper_company_name' ) );
+			$shipment->ShipFrom->addChild( 'CompanyName', $data['name'] );
 		}
 		$shipment->ShipFrom->addChild( 'AttentionName', $data['name'] );
 		$shipment->ShipFrom->addChild( 'AttentionName', $order->get_billing_phone() );
@@ -746,6 +807,7 @@ if( ! function_exists( 'msp_get_package_weight' ) ){
   *
   */
 	function msp_get_package_weight( $items ){
+		$weight = 0;
 		foreach( $items as $item ){
 			$item_weight = $item['weight'] * $item['qty'];
 			$weight += $item_weight;
@@ -790,7 +852,8 @@ if( ! function_exists( 'msp_create_return_email' ) ){
   */
   function msp_create_return_email( $returns, $args ){
     $message = '';
-    $message .= '<h3>Customer: ' . $returns['name'] . ' <' . $returns['email'] . '></h3>';
+    $message .= '<h3>Customer: ' . $returns['name'] . ' ' . $returns['email'] . '</h3>';
+		$message .= '<h3>Phone: '. $returns['phone'] .'</h3>';
     $message .= '<h3>Order #: ' . $returns['order'] . '</h3>';
     $message .= '<h4>I would like to return...</h4>';
     $message .= '<table style="border: 1px solid #eee;"><thead><th>SKU</th><th>Name</th><th>Quantity</th><th>Reason</th></thead>';
@@ -802,8 +865,12 @@ if( ! function_exists( 'msp_create_return_email' ) ){
       $message .= '<td style="border-right: 1px; padding-right: 15px;">'. $item['reason'] .'</td>';
       $message .= '<tr>';
     }
+		 $message .= '</table>';
+
+		$headers[]   = 'Reply-To: '. $returns['name'] .' <'. $returns['email'] .'>';
+
     // echo $message;
-    wp_mail( $args['to'], $args['subject'], $message );
+    wp_mail( $args['to'], $args['subject'], $message, $headers );
     wp_mail( $returns['email'], 'We got your return Request!', '<h2>We got your return Request, expect a response in 1-2 business days.</h2>' );
   }
 }
@@ -821,7 +888,7 @@ if( ! function_exists( 'msp_get_return_form_html' ) ){
             <?php $id = msp_get_actual_id( $item ); ?>
             <?php $product = wc_get_product( $id ); ?>
             <?php if( $product ) : ?>
-            <div id="<?php echo $id ?>" class="row return-product" data-qty="<?php echo $item['quantity'] ?>">
+            <div id="<?php echo $id ?>" class="row return-product" data-qty="<?php echo $item['quantity'] ?>" data-product-type="<?php echo $product->get_type(); ?>">
               <div class="col-3">
                 <?php $image_src = wp_get_attachment_image_src( $product->get_image_id() ); ?>
                 <div class="return-product-img" aria-checked="false">
@@ -889,16 +956,15 @@ if( ! function_exists( 'sc_return_item_html' ) ){
 }
 
 function msp_view_return_button( $return ){
-	// $link = get_site_url( ) . '/returns?return_id=' . $return->get_id();
+	$link = get_site_url( ) . '/returns?return_id=' . $return->get_order_id();
 	// TODO: allow user to edit and recover label;
-	// echo '<a href="'. $link .'" class="woocommerce-button button">View Return Request</a>';
-	// echo 'Return #' . $return->get_id();
+	echo '<a href="'. $link .'" class="woocommerce-button button">View Return Request</a>';
 }
 
 function msp_get_return_button( $order_id ){
 	$order = wc_get_order( $order_id );
 	if( $order->get_status( 'completed' ) ){
-		$delivered = $order->get_date_paid()->modify( '+10 days' );
+		$delivered = $order->get_date_completed()->modify( '+10 days' );
 		$return_by = $delivered->modify( '+' . get_option( 'msp_return_by' ) . ' days' );
 
 		$today = new DateTime();
