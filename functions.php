@@ -682,7 +682,11 @@ if( ! function_exists( 'msp_ups_create_shipment' ) ){
 		$shipment->ShipTo->Address->addChild( 'CountryCode', get_option( 'msp_ups_shipper_country_code' ) );
 
 		$shipment->addChild( 'ShipFrom' );
-		$shipment->ShipFrom->addChild( 'CompanyName', $order->get_billing_company() );
+		if( ! empty($order->get_billing_company() ) ){
+			$shipment->ShipFrom->addChild( 'CompanyName', $order->get_billing_company() );
+		} else {
+			$shipment->ShipFrom->addChild( 'CompanyName', get_option( 'msp_ups_shipper_company_name' ) );
+		}
 		$shipment->ShipFrom->addChild( 'AttentionName', $data['name'] );
 		$shipment->ShipFrom->addChild( 'AttentionName', $order->get_billing_phone() );
 
@@ -730,7 +734,7 @@ if( ! function_exists( 'msp_ups_create_shipment' ) ){
 }
 
 function msp_get_store_description( $order_id ){
-	return substr( get_bloginfo( 'name' ) . ' #: ' . $order_id, 0, 35 );
+	return substr( get_bloginfo( 'name' ) . ': #' . $order_id, 0, 35 );
 }
 
 if( ! function_exists( 'msp_get_package_weight' ) ){
@@ -742,7 +746,6 @@ if( ! function_exists( 'msp_get_package_weight' ) ){
   *
   */
 	function msp_get_package_weight( $items ){
-		$weight = 8;
 		foreach( $items as $item ){
 			$item_weight = $item['weight'] * $item['qty'];
 			$weight += $item_weight;
@@ -844,7 +847,7 @@ if( ! function_exists( 'msp_get_return_form_html' ) ){
             <h4>I am returning...</h4>
             <div id="return-data"></div>
             <div style="display: flex; margin-bottom: 1rem;">
-              <input id="check_return" class="form-control" type="checkbox">
+              <input id="check_return" type="checkbox">
               <label style="line-height: 12px;">I am confirming the above information is accurate.</label>
             </div>
             <button type="submit" class="woocommerce-button button w-100" disabled>Submit</button>
@@ -895,7 +898,7 @@ function msp_view_return_button( $return ){
 function msp_get_return_button( $order_id ){
 	$order = wc_get_order( $order_id );
 	if( $order->get_status( 'completed' ) ){
-		$delivered = $order->get_date_completed()->modify( '+5 days' );
+		$delivered = $order->get_date_paid()->modify( '+10 days' );
 		$return_by = $delivered->modify( '+' . get_option( 'msp_return_by' ) . ' days' );
 
 		$today = new DateTime();
