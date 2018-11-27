@@ -2,7 +2,7 @@
 /*
 Plugin Name: MSP Shipping
 Description: Allows for a website to connect with shipping API's
-Version: 1.0
+Version: 1.1
 Author: Gregory Bastianelli
 Author URI: http://drunk.kiwi
 Text Domain: msp-shipping
@@ -370,7 +370,6 @@ if( ! function_exists( 'msp_return_form_dispatcher' ) ){
   *
   */
   function msp_return_form_dispatcher(){
-		if( is_user_logged_in() && ! isset( $_GET['return_id'] ) ) wp_redirect('/my-account/orders/');
     if( isset( $_GET['id'], $_GET['email'] ) ){
       msp_validate_user( $_GET['id'], $_GET['email'] );
     } else if( isset( $_GET['return_id'] ) ){
@@ -973,6 +972,8 @@ function msp_get_return_button( $order_id ){
 			$link = get_site_url( ) . '/returns?id='. $order_id . '&email=' . $email;
 			$return_btn = '<a href="'. $link .'" class="woocommerce-button button">Return</a>';
 			echo $return_btn;
+		} else {
+			echo 'Return window closed ' . $return_by;
 		}
 	}
 
