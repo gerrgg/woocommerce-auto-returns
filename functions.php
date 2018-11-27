@@ -203,11 +203,11 @@ if( ! function_exists( 'msp_ship_menu_html' ) ){
 				<hr>
 				<h3>Returns</h3>
 				<table class="form-table">
-					<h4>Shipper / Shipto</h4>
 					<tr valign="top">
 						<th scope="row">Send Return Emails to</th>
 						<td><input type="email" name="msp_send_return_email_to" value="<?php echo esc_attr( get_option('msp_send_return_email_to') ); ?>" /></td>
 					</tr>
+					<h4>Shipper / Shipto</h4>
 					<tr valign="top">
 						<th scope="row">UPS Test Mode</th>
 						<td>
