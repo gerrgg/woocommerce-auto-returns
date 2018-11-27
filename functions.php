@@ -205,6 +205,10 @@ if( ! function_exists( 'msp_ship_menu_html' ) ){
 				<table class="form-table">
 					<h4>Shipper / Shipto</h4>
 					<tr valign="top">
+						<th scope="row">Send Return Emails to</th>
+						<td><input type="email" name="msp_send_return_email_to" value="<?php echo esc_attr( get_option('msp_send_return_email_to') ); ?>" /></td>
+					</tr>
+					<tr valign="top">
 						<th scope="row">UPS Test Mode</th>
 						<td>
 							<label>Test Mode</label>
@@ -487,7 +491,7 @@ if( ! function_exists( 'msp_confirm_return' ) ){
         }
       }
 			msp_create_return_email( $returns, array(
-				'to' => 'greg@'.get_bloginfo('name').'.com',
+				'to' => get_option( 'msp_send_return_email_to' ),
 				'subject' => $returns['name'] . ' wants to make a return',
 			) );
 			msp_shipment_confirm_request( $returns );
