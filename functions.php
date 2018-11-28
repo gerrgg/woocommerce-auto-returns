@@ -83,7 +83,7 @@ function msp_register_settings(){
   register_setting( 'msp_shipping_creds', 'msp_fedex_password' );
   register_setting( 'msp_shipping_creds', 'msp_log_to_file' );
   register_setting( 'msp_shipping_creds', 'msp_send_return_email_to' );
-
+  register_setting( 'msp_shipping_creds', 'msp_ups_return_service' );
 	register_setting( 'msp_shipping_creds', 'msp_ups_account_number' );
 	register_setting( 'msp_shipping_creds', 'msp_ups_shipper_company_name' );
 	register_setting( 'msp_shipping_creds', 'msp_ups_shipper_attn' );
@@ -114,12 +114,15 @@ function msp_install(){
 
 	$sql = "CREATE TABLE $table_name (
   id mediumint(9) NOT NULL AUTO_INCREMENT,
-	order_id mediumint(9) NOT NULL,
+	order_id mediumint(9) NOT NULL UNIQUE,
 	type text NOT NULL,
 	items text NOT NULL,
 	shipment_cost text NOT NULL,
 	billing_weight text NOT NULL,
 	tracking text NOT NULL,
+	label text NULL,
+	receipt text NULL,
+	digest text NOT NULL,
 	created timestamp DEFAULT CURRENT_TIMESTAMP NULL,
 	complete boolean DEFAULT 0,
   PRIMARY KEY  (id)
@@ -220,6 +223,17 @@ if( ! function_exists( 'msp_ship_menu_html' ) ){
 					<tr valign="top">
 						<th scope="row">Return Policy</th>
 						<td><input type="number" name="msp_return_by" value="<?php echo esc_attr( get_option('msp_return_by') ); ?>" /></td>
+					</tr>
+					<tr valign="top">
+						<th scope="row">Return Service Type</th>
+						<td>
+							<select name="msp_ups_return_service">
+								<option value="">Please Select an Option</option>
+								<option value="8" <?php if( get_option( 'msp_ups_return_service' ) == '8') echo 'selected'; ?>> 8 - UPS Electronic Return Label (ERL)</option>
+								<option value="9" <?php if( get_option( 'msp_ups_return_service' ) == '9') echo 'selected'; ?>> 9 - UPS Print Return Label (PRL)</option>
+								<option value="10" <?php if( get_option( 'msp_ups_return_service' ) == '10') echo 'selected'; ?>> 10 - UPS Exchange Print Return Label</option>
+							</select>
+						</td>
 					</tr>
 					<tr valign="top">
 						<th scope="row">UPS Account Number</th>
@@ -376,36 +390,64 @@ if( ! function_exists( 'msp_return_form_dispatcher' ) ){
   function msp_return_form_dispatcher(){
     if( isset( $_GET['id'], $_GET['email'] ) ){
       msp_validate_user( $_GET['id'], $_GET['email'] );
-    } else if( isset( $_GET['return_id'] ) ){
-			$return = new MSP_Return( $_GET['return_id'] );
-			?>
-			<div class="col-12 text-center">
-				<table>
-					<thead>
-						<th>RMA #</th>
-						<th>Order #</th>
-						<th>Type</th>
-						<th>Shipment Cost</th>
-						<th>Billing Weight</th>
-						<th>Tracking #</th>
-						<th>Label Created</th>
-					</thead>
-					<tbody>
-						<td><?php echo $return->get_id(); ?></td>
-						<td><?php echo $return->geT_order_id(); ?></td>
-						<td><?php echo $return->get_type(); ?></td>
-						<td><?php echo $return->get_cost(); ?></td>
-						<td><?php echo $return->get_billing_weight(); ?></td>
-						<td><?php echo $return->get_tracking(); ?></td>
-						<td><?php echo $return->get_created(); ?></td>
-					</tbody>
-				</table>
-			</div>
-			<?php
+    } else if( isset( $_GET['order_id'], $_GET['digest'] ) ){
+			$return = new MSP_Return( $_GET['order_id'] );
+			if( $return->exists ){
+				msp_view_ups_return( $return );
+			}else{
+				wp_redirect( '/my-account/orders' );
+			}
 		} else {
       msp_non_valid_user_return_form();
     }
   }
+}
+
+function msp_view_ups_return( $return ){
+	?>
+	<div class="row">
+		<div class="col-xs-12 col-sm-6">
+			<h3>Return Info</h3>
+			<table>
+				<tbody>
+					<tr>
+						<th>RMA #</th>
+						<td><?php echo $return->get_id(); ?></td>
+					</tr>
+					<tr>
+						<th>Order #</th>
+						<td><?php echo $return->get_order_id(); ?></td>
+					</tr>
+					<tr>
+						<th>Type</th>
+						<td><?php echo $return->get_type(); ?></td>
+					</tr>
+					<tr>
+						<th>Shipment Cost</th>
+						<td><?php echo $return->get_cost(); ?></td>
+					</tr>
+					<tr>
+						<th>Billing Weight</th>
+						<td><?php echo $return->get_billing_weight(); ?></td>
+					</tr>
+					<tr>
+						<th>Tracking #</th>
+						<td><?php echo $return->get_tracking(); ?></td>
+					</tr>
+					<tr>
+						<th>Label Created</th>
+						<td><?php echo $return->get_created(); ?></td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+		<div class="col-xs-12 col-md-6">
+			<h3>Actions</h3>
+			<a href="<?php echo $return->get_label()?>" role="button" class="button woocommerce woocommerce-button">View Shipping Label</a>
+			<a href="<?php echo $return->get_receipt()?>" role="button" class="button woocommerce woocommerce-button">View Shipping Receipt</a>
+		</div>
+	</div>
+	<?php
 }
 
 if( ! function_exists( 'msp_non_valid_user_return_form' ) ){
@@ -490,10 +532,10 @@ if( ! function_exists( 'msp_confirm_return' ) ){
           }
         }
       }
-			msp_create_return_email( $returns, array(
-				'to' => get_option( 'msp_send_return_email_to' ),
-				'subject' => $returns['name'] . ' wants to make a return',
-			) );
+			// msp_create_return_email( $returns, array(
+			// 	'to' => get_option( 'msp_send_return_email_to' ),
+			// 	'subject' => $returns['name'] . ' wants to make a return',
+			// ) );
 			msp_shipment_confirm_request( $returns );
     }
   }
@@ -515,7 +557,7 @@ if( ! function_exists( 'msp_shipment_confirm_request' ) ){
 		if( $response['Response']['ResponseStatusCode'] ){
 			msp_shipment_accept_request( $response, $data );
 		} else {
-			// pre_dump( $response );
+			pre_dump( $response );
 			return $response['Response']['ResponseStatusDescription'];
 		}
 
@@ -537,11 +579,10 @@ if( ! function_exists( 'msp_shipment_accept_request' ) ){
 		$response = sc_get_xml_by_curl( 'https://'. get_option( 'msp_ups_test_mode' ) .'.ups.com/ups.app/xml/ShipAccept', $xml );
 
 		if( $response['Response']['ResponseStatusCode'] ){
-			// pre_dump( $response );
 			msp_set_return( $response, $data );
-			wp_redirect( '/my-account/orders/' );
+			// wp_redirect( '/my-account/orders/' );
 		} else {
-			return $response['Response']['ResponseStatusDescription'];
+			pre_dump( $response );
 		}
 
 	}
@@ -549,38 +590,68 @@ if( ! function_exists( 'msp_shipment_accept_request' ) ){
 
 function msp_set_return( $response, $data ){
 		global $wpdb;
+		// pre_dump( $response );
 		$return = new MSP_Return( $data['order'] );
 
-		if( ! $return->exists ){
+		if( ! $return->exists || get_option( 'msp_ups_test_mode' ) == 'wwwcie' ){
+			$args = array(
+				'order_id' => $data['order'],
+				'type' => 'return',
+				'items' => $data['items'],
+				'shipment_cost' => $response['ShipmentResults']['ShipmentCharges']['TotalCharges']['MonetaryValue'],
+				'billing_weight' => $response['ShipmentResults']['BillingWeight']['Weight'],
+				'tracking' => $response['ShipmentResults']['ShipmentIdentificationNumber'],
+				'digest' => msp_create_digest(),
+			);
+
+			if( isset( $response['ShipmentResults']['PackageResults']['LabelImage'] ) ){
+				$labels = msp_save_ups_label( $response );
+				$args['label'] = $labels[1];
+				$args['receipt'] = $labels[2];
+			}
+
 			$wpdb->insert(
 				$wpdb->prefix . 'msp_return',
-				array(
-					'order_id' => $data['order'],
-					'type' => 'return',
-					'items' => $data['items'],
-					'shipment_cost' => $response['ShipmentResults']['ShipmentCharges']['TotalCharges']['MonetaryValue'],
-					'billing_weight' => $response['ShipmentResults']['BillingWeight']['Weight'],
-					'tracking' => $response['ShipmentResults']['ShipmentIdentificationNumber'],
-				) );
+				$args
+			);
+
+			wp_redirect( '/returns/?order_id='. $args['order_id'] . '&digest=' . $args['digest'] );
 		}
+}
+
+function msp_create_digest(){
+	return sha1( substr( md5( rand() ), 0, 10) );
 }
 
 function msp_save_ups_label( $response ){
 	$upload_dir = wp_upload_dir();
-	$write_to = $upload_dir['basedir'] . '/returns';
+	$order_id = $response['Response']['TransactionReference']['CustomerContext'];
+	$write_to = $upload_dir['basedir'] . '/returns/' . $order_id . '/';
+	$write_to_url = $upload_dir['baseurl'] . '/returns/' . $order_id . '/';
+	$tracking = $response['ShipmentResults']['ShipmentIdentificationNumber'];
 
 	if( ! file_exists( $write_to ) ) mkdir( $write_to );
 
-	$order_id = $response['Response']['TransactionReference']['CustomerContext'];
-	$base64_img = $response['ShipmentResults']['PackageResults']['LabelImage']['GraphicImage'];
+	$base_64_images = array(
+		'label' => $response['ShipmentResults']['PackageResults']['LabelImage']['GraphicImage'],
+		'html_image' => $response['ShipmentResults']['PackageResults']['LabelImage']['HTMLImage'],
+		'reciept' => $response['ShipmentResults']['PackageResults']['Receipt']['Image']['GraphicImage'],
+	);
 
-	$label_file = $order_id . ".gif";
-	$base64_string = $response['ShipmentResults']['PackageResults']['LabelImage']['GraphicImage'];
-	$ifp = fopen($write_to . '/' . $label_file, 'wb');
-	fwrite($ifp, base64_decode($base64_string));
-	fclose($ifp);
+	$image_paths = array();
 
-	return $write_to . '/' . $label_file;
+	pre_dump( $base_64_images );
+
+	foreach( $base_64_images as $key => $img ){
+		$ext = ( $key == 'label' ) ? '.gif' : '.html';
+		$label_file = $key . $tracking . $ext;
+		$ifp = fopen($write_to . '/' . $label_file, 'wb');
+		fwrite($ifp, base64_decode($img));
+		fclose($ifp);
+		array_push( $image_paths, $write_to_url . $label_file );
+	}
+
+	return $image_paths;
 }
 
 if( ! function_exists( 'msp_label_recovery_request' ) ){
@@ -705,20 +776,20 @@ if( ! function_exists( 'msp_ups_create_shipment' ) ){
 
 		// TODO: Add return service options
 		$shipment->addChild( 'ReturnService' );
-		$shipment->ReturnService->addChild( 'Code', '8' );
+		$shipment->ReturnService->addChild( 'Code', get_option( 'msp_ups_return_service' ) );
 
-		$shipment->addChild( 'ShipmentServiceOptions' );
-		$shipment->ShipmentServiceOptions->addChild( 'LabelDelivery' );
-		$shipment->ShipmentServiceOptions->LabelDelivery->addChild( 'EMailMessage' );
-		$shipment->ShipmentServiceOptions->LabelDelivery->EMailMessage->addChild( 'EMailAddress', $order->get_billing_email() );
-		$shipment->ShipmentServiceOptions->LabelDelivery->EMailMessage->addChild( 'FromEMailAddress', 'gregbast1994@gmail.com' );
-		$shipment->ShipmentServiceOptions->LabelDelivery->EMailMessage->addChild( 'FromName', get_bloginfo( 'name' ) );
-		$shipment->ShipmentServiceOptions->LabelDelivery->EMailMessage->addChild( 'Memo', 'Here\'s your shipping label!' );
-		$shipment->ShipmentServiceOptions->LabelDelivery->EMailMessage->addChild( 'Subject', 'Here\'s your shipping label!' );
-
+		if( get_option( 'msp_ups_return_service' ) == '8' ){
+			$shipment->addChild( 'ShipmentServiceOptions' );
+			$shipment->ShipmentServiceOptions->addChild( 'LabelDelivery' );
+			$shipment->ShipmentServiceOptions->LabelDelivery->addChild( 'EMailMessage' );
+			$shipment->ShipmentServiceOptions->LabelDelivery->EMailMessage->addChild( 'EMailAddress', $order->get_billing_email() );
+			$shipment->ShipmentServiceOptions->LabelDelivery->EMailMessage->addChild( 'FromEMailAddress', 'returns@' . get_bloginfo( 'name' ) . '.com' );
+			$shipment->ShipmentServiceOptions->LabelDelivery->EMailMessage->addChild( 'FromName', get_bloginfo( 'name' ) );
+			$shipment->ShipmentServiceOptions->LabelDelivery->EMailMessage->addChild( 'Memo', 'Here\'s your shipping label!' );
+			$shipment->ShipmentServiceOptions->LabelDelivery->EMailMessage->addChild( 'Subject', 'Here\'s your shipping label!' );
+		}
 
 		$shipment->addChild( 'Shipper' );
-
 		$shipment->Shipper->addChild( 'Name', get_option( 'msp_ups_shipper_company_name' ) );
 		$shipment->Shipper->addChild( 'AttentionName', get_option( 'msp_ups_shipper_attn' ) );
 		$shipment->Shipper->addChild( 'CompanyDisplayableName', get_option( 'msp_ups_shipper_company_display_name' ) );
@@ -950,7 +1021,7 @@ if( ! function_exists( 'sc_return_item_html' ) ){
   function sc_return_item_html( $order_id ){
 		$return = new MSP_Return( $order_id );
 
-		if( ! $return->exists ){
+		if( ! $return->exists || get_option( 'msp_ups_test_mode' ) == 'wwwcie' ){
 			msp_get_return_button( $order_id );
 		} else {
 			msp_view_return_button( $return );
@@ -959,7 +1030,7 @@ if( ! function_exists( 'sc_return_item_html' ) ){
 }
 
 function msp_view_return_button( $return ){
-	$link = get_site_url( ) . '/returns?return_id=' . $return->get_order_id();
+	$link = get_site_url( ) . '/returns?order_id=' . $return->get_order_id() . '&digest=' . $return->get_digest();
 	// TODO: allow user to edit and recover label;
 	echo '<a href="'. $link .'" class="woocommerce-button button">View Return Request</a>';
 }

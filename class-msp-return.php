@@ -69,6 +69,20 @@ class MSP_Return{
     return $this->data->created;
   }
 
+  public function get_label(){
+    return $this->data->label;
+  }
+
+  public function get_receipt(){
+    return $this->data->receipt;
+  }
+
+  public function get_digest(){
+    return $this->data->digest;
+  }
+
+
+
   public function set($insert){
     global $wpdb;
     $wpdb->insert(
