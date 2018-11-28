@@ -11,8 +11,7 @@ defined( 'ABSPATH' ) or die( 'No script kiddies please!' );
 
 register_activation_hook( __FILE__, 'msp_install' );
 require_once( plugin_dir_path( __FILE__ ) . '/class-msp-return.php' );
-
-
+add_action( 'admin_notices', 'sample_admin_notice__error' );
 add_action( 'wp_enqueue_scripts', 'msp_enqueue_scripts');
 add_shortcode( 'return_form', 'msp_return_form_dispatcher' );
 add_action( 'admin_init', 'msp_register_settings');
@@ -42,6 +41,16 @@ if( ! function_exists( 'pre_dump' ) ){
 	  echo '<pre>';
 	}
 }
+
+function sample_admin_notice__error() {
+	if( empty( get_option( 'msp_ups_api_key' ) ) ){
+		$class = 'notice notice-warning is-dismissible';
+		$message = __( 'You are going to want to <a href="'. admin_url( 'plugins.php?page=msp_ship_menu' ) .'">setup MSP_Shipping Plugin</a> before you go!', 'sample-text-domain' );
+
+		printf( '<div class="%1$s"><p>%2$s</p></div>', esc_attr( $class ), $message );
+	}
+}
+
 add_action( 'wp_ajax_get_variations_for_js', 'get_variations_for_js' );
 function get_variations_for_js(){
 	$variations = array();
@@ -148,6 +157,10 @@ function msp_get_current_returns(){
 		<td><?php echo $row->tracking; ?></td>
 		<td><?php echo $row->created; ?></td>
 		<td><input type="checkbox" value="1" name="order[<?php echo $row->id ?>]" <?php checked( $row->complete, '1' ); ?> /></td>
+		<td>
+			<?php $return = new MSP_Return( $row->order_id ); ?>
+			<a href="<?php echo $return->get_view_return_url() ?>">View</a>
+		</td>
 	</tr>
 	<?php endforeach;
 }
@@ -162,8 +175,29 @@ if( ! function_exists( 'msp_ship_menu_html' ) ){
   function msp_ship_menu_html(){
     ?>
     <div class="wrap">
-
-      <h1>Michgian Safety Products Shipping settings</h1>
+			<form id="current_returns" method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<h1>Current Returns</h1>
+			<div class="returns">
+				<table>
+					<thead>
+						<th>ID</th>
+						<th>Order ID</th>
+						<th>Type</th>
+						<th>Items</th>
+						<th>Cost</th>
+						<th>Billing Weight</th>
+						<th>Tracking</th>
+						<th>Created</th>
+						<th>Complete</th>
+						<th>View</th>
+					</thead>
+					<?php msp_get_current_returns(); ?>
+				</table>
+			</div>
+			<input type="hidden" name="action" value="complete_returns">
+			<?php submit_button(); ?>
+		</form>
+      <h1>Michigan Safety Products Shipping settings</h1>
       <div class="ups">
         <form method="post" action="options.php">
           <?php
@@ -341,27 +375,6 @@ if( ! function_exists( 'msp_ship_menu_html' ) ){
 				</table>
         <?php submit_button(); ?>
         </form>
-				<form id="current_returns" method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<h1>Current Returns</h1>
-				<div class="returns">
-					<table>
-						<thead>
-							<th>ID</th>
-							<th>Order ID</th>
-							<th>Type</th>
-							<th>Items</th>
-							<th>Cost</th>
-							<th>Billing Weight</th>
-							<th>Tracking</th>
-							<th>Created</th>
-							<th>Complete</th>
-						</thead>
-						<?php msp_get_current_returns(); ?>
-					</table>
-				</div>
-				<input type="hidden" name="action" value="complete_returns">
-				<?php submit_button(); ?>
-			</form>
       </div>
     </div>
     <?php
@@ -443,8 +456,9 @@ function msp_view_ups_return( $return ){
 		</div>
 		<div class="col-xs-12 col-md-6">
 			<h3>Actions</h3>
-			<a href="<?php echo $return->get_label()?>" role="button" class="button woocommerce woocommerce-button">View Shipping Label</a>
-			<a href="<?php echo $return->get_receipt()?>" role="button" class="button woocommerce woocommerce-button">View Shipping Receipt</a>
+			<a href="<?php echo $return->get_label()?>" role="button" class="button woocommerce-button button btn-success">View Label</a>
+			<a href="<?php echo $return->get_receipt()?>" role="button" class="button woocommerce-button button btn-alt">View Receipt</a>
+			<a href="<?php echo $return->get_redo_return_url(); ?>" role="button" class="button woocommerce-button btn-danger">Redo Return Request</a>
 		</div>
 	</div>
 	<?php
@@ -580,7 +594,6 @@ if( ! function_exists( 'msp_shipment_accept_request' ) ){
 
 		if( $response['Response']['ResponseStatusCode'] ){
 			msp_set_return( $response, $data );
-			// wp_redirect( '/my-account/orders/' );
 		} else {
 			pre_dump( $response );
 		}
@@ -590,33 +603,39 @@ if( ! function_exists( 'msp_shipment_accept_request' ) ){
 
 function msp_set_return( $response, $data ){
 		global $wpdb;
-		// pre_dump( $response );
+		$args = array(
+			'order_id' => $data['order'],
+			'type' => 'return',
+			'items' => $data['items'],
+			'shipment_cost' => $response['ShipmentResults']['ShipmentCharges']['TotalCharges']['MonetaryValue'],
+			'billing_weight' => $response['ShipmentResults']['BillingWeight']['Weight'],
+			'tracking' => $response['ShipmentResults']['ShipmentIdentificationNumber'],
+			'digest' => msp_create_digest(),
+		);
+
+		if( isset( $response['ShipmentResults']['PackageResults']['LabelImage'] ) ){
+			$labels = msp_save_ups_label( $response );
+			$args['label'] = $labels[1];
+			$args['receipt'] = $labels[2];
+		}
+
 		$return = new MSP_Return( $data['order'] );
 
-		if( ! $return->exists || get_option( 'msp_ups_test_mode' ) == 'wwwcie' ){
-			$args = array(
-				'order_id' => $data['order'],
-				'type' => 'return',
-				'items' => $data['items'],
-				'shipment_cost' => $response['ShipmentResults']['ShipmentCharges']['TotalCharges']['MonetaryValue'],
-				'billing_weight' => $response['ShipmentResults']['BillingWeight']['Weight'],
-				'tracking' => $response['ShipmentResults']['ShipmentIdentificationNumber'],
-				'digest' => msp_create_digest(),
-			);
-
-			if( isset( $response['ShipmentResults']['PackageResults']['LabelImage'] ) ){
-				$labels = msp_save_ups_label( $response );
-				$args['label'] = $labels[1];
-				$args['receipt'] = $labels[2];
-			}
-
+		if ( ! $return->exists ){
 			$wpdb->insert(
 				$wpdb->prefix . 'msp_return',
 				$args
 			);
+		} else {
 
-			wp_redirect( '/returns/?order_id='. $args['order_id'] . '&digest=' . $args['digest'] );
+			$wpdb->update(
+				$wpdb->prefix . 'msp_return',
+				$args,
+				array( 'order_id' => $args['order_id'] )
+			);
 		}
+
+		wp_redirect( '/returns/?order_id='. $args['order_id'] . '&digest=' . $args['digest'] );
 }
 
 function msp_create_digest(){

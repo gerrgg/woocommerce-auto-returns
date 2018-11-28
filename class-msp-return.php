@@ -81,6 +81,30 @@ class MSP_Return{
     return $this->data->digest;
   }
 
+  public function get_label_dir(){
+    $upload_dir = wp_upload_dir();
+    return $upload_dir['basedir'] . '/returns/' . $this->get_order_id() . '/';
+  }
+
+  public function rm_label_dir(){
+    $path = $this->get_label_dir();
+    $tracking = $this->get_tracking();
+    unlink( $path . 'label' . $tracking . '.gif' );
+    unlink( $path . 'reciept' . $tracking . '.html' );
+    unlink( $path . 'html_image' . $tracking . '.html' );
+    rmdir( $path );
+  }
+
+  public function get_redo_return_url(){
+    $order = wc_get_order( $this->get_order_id() );
+    if( ! $order ) return;
+
+    return get_site_url() . '/returns/?id=' . $order->get_id() . '&email=' . $order->get_billing_email();
+  }
+
+  public function get_view_return_url(){
+    return get_site_url() . '/returns/?order_id=' . $this->get_order_id() . '&digest=' . $this->get_digest();
+  }
 
 
   public function set($insert){

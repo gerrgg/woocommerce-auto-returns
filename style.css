@@ -1,3 +1,13 @@
+.btn-success{
+  background-color: green!important;
+}
+.btn-alt{
+  background-color: teal!important;
+}
+.btn-danger{
+  background-color: red!important;
+}
+
 .exchange_for{
   border: 1px solid #eee;
 }
