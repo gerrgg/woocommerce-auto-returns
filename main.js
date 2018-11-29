@@ -5,6 +5,7 @@ jQuery(document).ready(function( $ ){
   var $confirm_box = $( '#return-data' );
 
   $('form').on('click', '.return-product', function(){
+    var $exchanges_allowed = $('#exchanges_allowed').val();
     var id = $(this).attr('id');
     var qty = $(this).attr( 'data-qty' );
     var $image = $(this).find('div').find('div.return-product-img');
@@ -31,7 +32,7 @@ jQuery(document).ready(function( $ ){
                               name: id + '[how_many]',
                               value: qty
                             } );
-        $form.append( create_return_reason_form( id, type ), hidden_awnser );
+        $form.append( create_return_reason_form( id, type, $exchanges_allowed ), hidden_awnser );
       }
 
 
@@ -39,7 +40,7 @@ jQuery(document).ready(function( $ ){
       $('.return-all-radio').change(function(){
         var awnser = this.value;
         if( awnser == 'yes' ){
-          if( ! $( '#' + id + '_reason_form' ).length ) $form.append( create_return_reason_form( id, type ) );
+          if( ! $( '#' + id + '_reason_form' ).length ) $form.append( create_return_reason_form( id, type, $exchanges_allowed ) );
           // if they say yes, then create a hidden input with value of the order qty
           var hidden_awnser = $('<input/>', {
                                 type: 'hidden',
@@ -62,7 +63,7 @@ jQuery(document).ready(function( $ ){
         var given_qty = this.value;
         ( given_qty > qty ) ? $(this).val( qty ) : $('#' + id + '_return_quantity').html( given_qty );
         // if already exists in DOM, do not make.
-        if( ! $( '#' + id + '_reason_form' ).length && given_qty != '' ) $form.append( create_return_reason_form( id, type ) );
+        if( ! $( '#' + id + '_reason_form' ).length && given_qty != '' ) $form.append( create_return_reason_form( id, type, $exchanges_allowed ) );
       } );
 
       $form.on( 'change', '#' + id + '_reason_select', function(){
@@ -184,17 +185,17 @@ jQuery(document).ready(function( $ ){
     return string.charAt(0).toUpperCase() + string.slice(1);
   }
 
-  function create_return_reason_form( id, type ){
+  function create_return_reason_form( id, type, $exchanges_allowed ){
     var $reason_form = $( '<div/>', {
       id: id + '_reason_form',
       class: 'form-group'
     } );
-    var $select = create_return_reason_select( id, type );
+    var $select = create_return_reason_select( id, type, $exchanges_allowed );
     $reason_form.append( '<h4>Why are your returning this item?</h4>', $select );
     return $reason_form;
   }
 
-  function create_return_reason_select( id, type ){
+  function create_return_reason_select( id, type, $exchanges_allowed ){
     var reasons = [
       'Please select a reason for return',
       'No longer needed',
@@ -210,7 +211,7 @@ jQuery(document).ready(function( $ ){
       'Didnt approve purchase'
     ];
 
-    if( type == 'variation' ) reasons.splice( 1, 0, 'I\'d like to make an exchange' );
+    if( type == 'variation' && $exchanges_allowed == 1 ) reasons.splice( 1, 0, 'I\'d like to make an exchange' );
 
     var $select = $( '<select/>', {
       id: id + '_reason_select',

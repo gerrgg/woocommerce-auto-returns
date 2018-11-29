@@ -98,6 +98,7 @@ function msp_register_settings(){
   register_setting( 'msp_shipping_creds', 'msp_log_to_file' );
   register_setting( 'msp_shipping_creds', 'msp_send_return_email_to' );
   register_setting( 'msp_shipping_creds', 'msp_ups_return_service' );
+	register_setting( 'msp_shipping_creds', 'msp_ups_exchanges_allowed' );
 	register_setting( 'msp_shipping_creds', 'msp_ups_account_number' );
 	register_setting( 'msp_shipping_creds', 'msp_ups_shipper_company_name' );
 	register_setting( 'msp_shipping_creds', 'msp_ups_shipper_attn' );
@@ -263,6 +264,10 @@ if( ! function_exists( 'msp_ship_menu_html' ) ){
 					<tr valign="top">
 						<th scope="row">Return Policy</th>
 						<td><input type="number" name="msp_return_by" value="<?php echo esc_attr( get_option('msp_return_by') ); ?>" /></td>
+					</tr>
+					<tr valign="top">
+						<th scope="row">Exchanges allowed?</th>
+						<td><input type="checkbox" name="msp_ups_exchanges_allowed" value="1" <?php checked( get_option( 'msp_ups_exchanges_allowed' ) ); ?> /></td>
 					</tr>
 					<tr valign="top">
 						<th scope="row">Return Service Type</th>
@@ -1090,6 +1095,7 @@ if( ! function_exists( 'msp_get_return_form_html' ) ){
             <?php endif; ?>
           <?php endforeach; ?>
           <br>
+					<input type="hidden" id="exchanges_allowed" name="exchanges_allowed" value="<?php echo get_option( 'msp_ups_exchanges_allowed' ); ?>">
           <input type="hidden" name="order_id" value="<?php echo $order->get_id(); ?>">
           <input type="hidden" name="action" value="confirm_return">
         </div>
