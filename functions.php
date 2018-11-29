@@ -474,10 +474,10 @@ function msp_view_ups_return( $return ){
 		<div class="col-xs-12 col-md-6">
 			<?php if( ! $return->is_complete() ) : ?>
 			<h3>Actions</h3>
-			<a target='_blank' href="<?php echo $return->get_label()?>" role="button" class="button woocommerce-button button btn-success">View Label</a>
 			<?php if( in_array( 'administrator', (array) $user->roles ) ) : ?>
 				<a href="<?php echo $return->get_receipt()?>" role="button" class="button woocommerce-button button btn-alt">View Receipt</a>
 			<?php endif; ?>
+			<a target='_blank' href="<?php echo $return->get_label()?>" role="button" class="button woocommerce-button button btn-success">View Label</a>
 			<a href="<?php echo $return->get_redo_return_url(); ?>" role="button" class="button woocommerce-button btn-info">Redo Return Request</a>
 			<?php if( $return->can_void_shipment() ) : ?>
 				<a href="<?php echo $return->get_void_shipment_url(); ?>" role="button" class="void-return button woocommerce-button btn-danger">Void Shipment</a>
@@ -1159,7 +1159,7 @@ function msp_get_return_button( $order_id ){
 			$return_btn = '<a href="'. $link .'" class="woocommerce-button button btn-danger">Return</a>';
 			echo $return_btn;
 		} else {
-			echo 'Return window closed ' . $return_by;
+			echo '<a href="#" class="woocommerce-button button btn-black">Return window closed ' . $return_by . '</a>';
 		}
 	}
 

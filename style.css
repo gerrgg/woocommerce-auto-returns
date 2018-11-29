@@ -7,6 +7,9 @@
 .btn-danger{
   background-color: red!important;
 }
+.btn-black{
+  background-color: #000!important;
+}
 
 .exchange_for{
   border: 1px solid #eee;
