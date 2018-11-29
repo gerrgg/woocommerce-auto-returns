@@ -11,7 +11,7 @@ defined( 'ABSPATH' ) or die( 'No script kiddies please!' );
 
 register_activation_hook( __FILE__, 'msp_install' );
 require_once( plugin_dir_path( __FILE__ ) . '/class-msp-return.php' );
-add_action( 'admin_notices', 'sample_admin_notice__error' );
+add_action( 'admin_notices', 'admin_error' );
 add_action( 'wp_enqueue_scripts', 'msp_enqueue_scripts');
 add_shortcode( 'return_form', 'msp_return_form_dispatcher' );
 add_action( 'admin_init', 'msp_register_settings');
@@ -42,12 +42,17 @@ if( ! function_exists( 'pre_dump' ) ){
 	}
 }
 
-function sample_admin_notice__error() {
+function admin_error( $error = '' ) {
 	if( empty( get_option( 'msp_ups_api_key' ) ) ){
 		$class = 'notice notice-warning is-dismissible';
 		$message = __( 'You are going to want to <a href="'. admin_url( 'plugins.php?page=msp_ship_menu' ) .'">setup MSP_Shipping Plugin</a> before you go!', 'sample-text-domain' );
-
 		printf( '<div class="%1$s"><p>%2$s</p></div>', esc_attr( $class ), $message );
+	} else {
+		if( ! empty( $error ) ){
+			$class = 'notice notice-error is-dismissible';
+			$message = __( $error . '<a href="'. admin_url( 'plugins.php?page=msp_ship_menu' ) .'">Go to settings to fix it!</a>', 'sample-text-domain' );
+			printf( '<div class="%1$s"><p>%2$s</p></div>', esc_attr( $class ), $message );
+		}
 	}
 }
 
@@ -467,16 +472,26 @@ function msp_view_ups_return( $return ){
 			</table>
 		</div>
 		<div class="col-xs-12 col-md-6">
+			<?php if( ! $return->is_complete() ) : ?>
 			<h3>Actions</h3>
 			<a href="<?php echo $return->get_label()?>" role="button" class="button woocommerce-button button btn-success">View Label</a>
 			<a href="<?php echo $return->get_receipt()?>" role="button" class="button woocommerce-button button btn-alt">View Receipt</a>
 			<a href="<?php echo $return->get_redo_return_url(); ?>" role="button" class="button woocommerce-button btn-info">Redo Return Request</a>
 			<?php if( $return->can_void_shipment() ) : ?>
 				<a href="<?php echo $return->get_void_shipment_url(); ?>" role="button" class="void-return button woocommerce-button btn-danger">Void Shipment</a>
-			<?php endif ?>
+			<?php endif; ?>
+		<?php else: ?>
+			<h3>Return has been marked complete.</h3>
+			<!-- TODO: add option to include where you contact us page is && LOGO -->
+			<?php echo msp_contact_us(); ?>
+		<?php endif ?>
 		</div>
 	</div>
 	<?php
+}
+
+function msp_contact_us(){
+	return '<p>If you believe this is a mistake, <a href="' . get_site_url( ) . '/contact-us/">please contact us</a></p>';
 }
 
 if( ! function_exists( 'msp_non_valid_user_return_form' ) ){
@@ -590,8 +605,7 @@ if( ! function_exists( 'msp_shipment_confirm_request' ) ){
 		if( $response['Response']['ResponseStatusCode'] ){
 			msp_shipment_accept_request( $response, $data );
 		} else {
-			pre_dump( $response );
-			return $response['Response']['ResponseStatusDescription'];
+			admin_error( $response );
 		}
 
 	}
@@ -614,7 +628,7 @@ if( ! function_exists( 'msp_shipment_accept_request' ) ){
 		if( $response['Response']['ResponseStatusCode'] ){
 			msp_set_return( $response, $data );
 		} else {
-			pre_dump( $response );
+			admin_error( $response );
 		}
 
 	}
@@ -791,7 +805,7 @@ if( ! function_exists( 'msp_ups_void_return_xml' ) ){
 				$return->rm_label_dir();
 				$return->destroy();
 			}else{
-				return 'Sorry, you do not have permission to void this shipment.';
+				admin_error( $response );
 			}
 		}
 	}
@@ -1123,9 +1137,9 @@ if( ! function_exists( 'sc_return_item_html' ) ){
 }
 
 function msp_view_return_button( $return ){
-	$link = get_site_url( ) . '/returns?order_id=' . $return->get_order_id() . '&digest=' . $return->get_digest();
+	$btn_str = ( ! $return->is_complete() ) ? 'View Return Request' : 'Return Completed';
 	// TODO: allow user to edit and recover label;
-	echo '<a href="'. $link .'" class="woocommerce-button button">View Return Request</a>';
+	echo '<a href="'. $return->get_view_return_url() .'" class="woocommerce-button button">'. $btn_str .'</a>';
 }
 
 function msp_get_return_button( $order_id ){

@@ -77,6 +77,10 @@ class MSP_Return{
     return $this->data->user_id;
   }
 
+  public function is_complete(){
+    return $this->data->complete;
+  }
+
   public function can_void_shipment(){
     $user = wp_get_current_user();
     $order = wc_get_order( $this->get_order_id() );
