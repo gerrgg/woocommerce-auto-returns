@@ -670,7 +670,8 @@ function msp_set_return( $response, $data ){
 			);
 		} else {
 			msp_ups_void_return_xml( $return );
-			$return->rm_label_dir();
+			// $return->rm_label_dir();
+			// // $return->destroy();
 			$wpdb->update(
 				$wpdb->prefix . 'msp_return',
 				$args,
@@ -810,7 +811,7 @@ if( ! function_exists( 'msp_ups_void_return_xml' ) ){
 		if( isset( $response['Status']['StatusCode']['Code'] ) && $response['Status']['StatusCode']['Code'] ){
 			if( $return->can_void_shipment() ){
 				$return->rm_label_dir();
-				$return->destroy();
+				// $return->destroy();
 			}else{
 				admin_error( $response );
 			}
