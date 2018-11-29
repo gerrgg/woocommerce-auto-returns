@@ -475,7 +475,7 @@ function msp_view_ups_return( $return ){
 			<?php if( ! $return->is_complete() ) : ?>
 			<h3>Actions</h3>
 			<a target='_blank' href="<?php echo $return->get_label()?>" role="button" class="button woocommerce-button button btn-success">View Label</a>
-			<?php if( in_array( 'administrator', (array) $user->roles ) ) : ?> ?>
+			<?php if( in_array( 'administrator', (array) $user->roles ) ) : ?>
 				<a href="<?php echo $return->get_receipt()?>" role="button" class="button woocommerce-button button btn-alt">View Receipt</a>
 			<?php endif; ?>
 			<a href="<?php echo $return->get_redo_return_url(); ?>" role="button" class="button woocommerce-button btn-info">Redo Return Request</a>
@@ -1050,9 +1050,10 @@ if( ! function_exists( 'msp_create_return_email' ) ){
 if( ! function_exists( 'create_customer_return_email' ) ){
 	function create_customer_return_email( $return, $email ){
 		$message = "<h2>We've got your return label!</h2>";
+		$message .= '<p><a href="'. $return->get_view_return_url() .'">View Return</a></p>';
 		$message .= '<p><a href="'. $return->get_label() .'">Get Label</a></p>';
-		$message .= '<p><a href="'. $return->get_view_return_url() .'">Redo Return</a></p>';
-		$message .= '<p><a href="'. $return->get_void_shipment_url() .'">Void Return</a></p>';
+		$message .= '<p><a href="'. $return->get_redo_return_url() .'">Redo Return</a></p>';
+		// $message .= '<p><a href="'. $return->get_void_shipment_url() .'">Void Return</a></p>';
 
 		wp_mail( $email, get_bloginfo('name') . ' - UPS Return Label', $message );
 	}
@@ -1140,8 +1141,9 @@ if( ! function_exists( 'sc_return_item_html' ) ){
 
 function msp_view_return_button( $return ){
 	$btn_str = ( ! $return->is_complete() ) ? 'View Return Request' : 'Return Completed';
+	$btn_class = ( ! $return->is_complete() ) ? 'btn-alt' : 'btn-success';
 	// TODO: allow user to edit and recover label;
-	echo '<a href="'. $return->get_view_return_url() .'" class="woocommerce-button button">'. $btn_str .'</a>';
+	echo '<a href="'. $return->get_view_return_url() .'" class="woocommerce-button button '. $btn_class .'">'. $btn_str .'</a>';
 }
 
 function msp_get_return_button( $order_id ){
@@ -1154,7 +1156,7 @@ function msp_get_return_button( $order_id ){
 		if( $today <= $return_by ){
 			$email = $order->get_billing_email();
 			$link = get_site_url( ) . '/returns?id='. $order_id . '&email=' . $email;
-			$return_btn = '<a href="'. $link .'" class="woocommerce-button button">Return</a>';
+			$return_btn = '<a href="'. $link .'" class="woocommerce-button button btn-danger">Return</a>';
 			echo $return_btn;
 		} else {
 			echo 'Return window closed ' . $return_by;

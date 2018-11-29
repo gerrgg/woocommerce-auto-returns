@@ -87,9 +87,6 @@ jQuery(document).ready(function( $ ){
         if( total > qty ){
           $(this).val( 0 );
         }
-        console.log( str );
-
-
         // $('#exchange_header span').html( total + '/' + qty );
       } );
 
