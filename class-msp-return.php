@@ -6,14 +6,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class MSP_Return{
   public $exists = false;
-  protected $data = array(
-    'id' => 0,
-    'order_id' => 0,
-    'type' => '',
-    'cost' => '',
-    'billing_weight' => '',
-    'tracking' => '',
-  );
 
   public function __construct( $id ){
     if( $this->return_exists( $id ) ){
@@ -81,6 +73,17 @@ class MSP_Return{
     return $this->data->digest;
   }
 
+  public function get_user_id(){
+    return $this->data->user_id;
+  }
+
+  public function can_void_shipment(){
+    $user = wp_get_current_user();
+    $order = wc_get_order( $this->get_order_id() );
+    $customer_id = $order->get_user_id();
+    return ( in_array( 'administrator', (array) $user->roles ) || $user->ID === $customer_id  );
+  }
+
   public function get_label_dir(){
     $upload_dir = wp_upload_dir();
     return $upload_dir['basedir'] . '/returns/' . $this->get_order_id() . '/';
@@ -104,6 +107,18 @@ class MSP_Return{
 
   public function get_view_return_url(){
     return get_site_url() . '/returns/?order_id=' . $this->get_order_id() . '&digest=' . $this->get_digest();
+  }
+
+  public function get_void_shipment_url(){
+      return get_site_url() . '/returns/?order_id=' . $this->get_order_id() . '&digest=' . $this->get_digest() . '&action=void&id='.get_current_user_id();
+  }
+
+  public function destroy(){
+    global $wpdb;
+    $wpdb->delete(
+      $wpdb->prefix . 'msp_return',
+      array( 'id' => $this->get_id() )
+    );
   }
 
 

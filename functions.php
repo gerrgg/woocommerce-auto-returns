@@ -124,6 +124,7 @@ function msp_install(){
 	$sql = "CREATE TABLE $table_name (
   id mediumint(9) NOT NULL AUTO_INCREMENT,
 	order_id mediumint(9) NOT NULL UNIQUE,
+	user_id mediumint(9) NOT NULL,
 	type text NOT NULL,
 	items text NOT NULL,
 	shipment_cost text NOT NULL,
@@ -401,12 +402,19 @@ if( ! function_exists( 'msp_return_form_dispatcher' ) ){
   *
   */
   function msp_return_form_dispatcher(){
+		// TODO: UGGGGGGGGGLY
     if( isset( $_GET['id'], $_GET['email'] ) ){
       msp_validate_user( $_GET['id'], $_GET['email'] );
     } else if( isset( $_GET['order_id'], $_GET['digest'] ) ){
 			$return = new MSP_Return( $_GET['order_id'] );
+			// pre_dump( $return );
 			if( $return->exists ){
-				msp_view_ups_return( $return );
+				if( isset( $_GET['action'], $_GET['id'] ) && $_GET['action'] == 'void'){
+					msp_ups_void_return_xml( $return );
+					wp_redirect( '/my-account/orders' );
+				} else {
+					msp_view_ups_return( $return );
+				}
 			}else{
 				wp_redirect( '/my-account/orders' );
 			}
@@ -435,10 +443,14 @@ function msp_view_ups_return( $return ){
 						<th>Type</th>
 						<td><?php echo $return->get_type(); ?></td>
 					</tr>
+					<?php
+					$user = wp_get_current_user();
+					if( in_array( 'administrator', (array) $user->roles ) ) : ?>
 					<tr>
 						<th>Shipment Cost</th>
 						<td><?php echo $return->get_cost(); ?></td>
 					</tr>
+					<?php endif; ?>
 					<tr>
 						<th>Billing Weight</th>
 						<td><?php echo $return->get_billing_weight(); ?></td>
@@ -458,7 +470,10 @@ function msp_view_ups_return( $return ){
 			<h3>Actions</h3>
 			<a href="<?php echo $return->get_label()?>" role="button" class="button woocommerce-button button btn-success">View Label</a>
 			<a href="<?php echo $return->get_receipt()?>" role="button" class="button woocommerce-button button btn-alt">View Receipt</a>
-			<a href="<?php echo $return->get_redo_return_url(); ?>" role="button" class="button woocommerce-button btn-danger">Redo Return Request</a>
+			<a href="<?php echo $return->get_redo_return_url(); ?>" role="button" class="button woocommerce-button btn-info">Redo Return Request</a>
+			<?php if( $return->can_void_shipment() ) : ?>
+				<a href="<?php echo $return->get_void_shipment_url(); ?>" role="button" class="void-return button woocommerce-button btn-danger">Void Shipment</a>
+			<?php endif ?>
 		</div>
 	</div>
 	<?php
@@ -522,7 +537,6 @@ if( ! function_exists( 'msp_confirm_return' ) ){
   *
   */
   function msp_confirm_return(){
-    // pre_dump( $_POST );
     $order = wc_get_order( $_POST['order_id'] );
     if( $order ){
       $returns = array(
@@ -530,26 +544,31 @@ if( ! function_exists( 'msp_confirm_return' ) ){
         'email' => $order->get_billing_email(),
 				'phone' => $order->get_billing_phone(),
         'order' => $order->get_id(),
+				'type'  => 'return'
       );
       foreach( $_POST as $key => $item ){
         if( $key != 'order_id' && $key != 'action' ){
           $product = wc_get_product( $key );
           if( $product ){
             $returns['items'][$key] = array(
-              'id' => $key,
+							'qty' => $item['how_many'],
               'sku' => $product->get_sku(),
               'name' => $product->get_name(),
               'weight' => $product->get_weight(),
-              'qty' => $_POST[$key]['how_many'],
-              'reason' => $_POST[$key]['return_reason'],
+              'reason' => $item['return_reason'],
+							'id' => $key,
             );
           }
+					if( $item['return_reason'] == "I\'d like to make an exchange" ){
+						$returns['type'] = 'exchange';
+						foreach( $item['exchange_for'] as $id => $qty ){
+							if( !empty( $qty ) ) $returns['items'][$key]['exchange_for'][$id] = $qty;
+						}
+					}
         }
       }
-			// msp_create_return_email( $returns, array(
-			// 	'to' => get_option( 'msp_send_return_email_to' ),
-			// 	'subject' => $returns['name'] . ' wants to make a return',
-			// ) );
+			// pre_dump( $_POST );
+			// pre_dump( $returns );
 			msp_shipment_confirm_request( $returns );
     }
   }
@@ -603,14 +622,16 @@ if( ! function_exists( 'msp_shipment_accept_request' ) ){
 
 function msp_set_return( $response, $data ){
 		global $wpdb;
+		$order = wc_get_order( $data['order'] );
 		$args = array(
 			'order_id' => $data['order'],
-			'type' => 'return',
+			'type' => $data['type'],
 			'items' => $data['items'],
 			'shipment_cost' => $response['ShipmentResults']['ShipmentCharges']['TotalCharges']['MonetaryValue'],
 			'billing_weight' => $response['ShipmentResults']['BillingWeight']['Weight'],
 			'tracking' => $response['ShipmentResults']['ShipmentIdentificationNumber'],
 			'digest' => msp_create_digest(),
+			'user_id' => $order->get_user_id(),
 		);
 
 		if( isset( $response['ShipmentResults']['PackageResults']['LabelImage'] ) ){
@@ -627,7 +648,8 @@ function msp_set_return( $response, $data ){
 				$args
 			);
 		} else {
-
+			msp_ups_void_return_xml( $return );
+			$return->rm_label_dir();
 			$wpdb->update(
 				$wpdb->prefix . 'msp_return',
 				$args,
@@ -635,7 +657,12 @@ function msp_set_return( $response, $data ){
 			);
 		}
 
-		wp_redirect( '/returns/?order_id='. $args['order_id'] . '&digest=' . $args['digest'] );
+		msp_create_return_email( $data, array(
+			'to' => get_option( 'msp_send_return_email_to' ),
+			'subject' => $data['name'] . ' wants to make a return',
+		) );
+		$new_return = new MSP_Return( $data['order'] );
+		wp_redirect( $new_return->get_view_return_url() );
 }
 
 function msp_create_digest(){
@@ -656,10 +683,7 @@ function msp_save_ups_label( $response ){
 		'html_image' => $response['ShipmentResults']['PackageResults']['LabelImage']['HTMLImage'],
 		'reciept' => $response['ShipmentResults']['PackageResults']['Receipt']['Image']['GraphicImage'],
 	);
-
 	$image_paths = array();
-
-	pre_dump( $base_64_images );
 
 	foreach( $base_64_images as $key => $img ){
 		$ext = ( $key == 'label' ) ? '.gif' : '.html';
@@ -671,36 +695,6 @@ function msp_save_ups_label( $response ){
 	}
 
 	return $image_paths;
-}
-
-if( ! function_exists( 'msp_label_recovery_request' ) ){
-  /**
-  *
-  * creates label recovery request
-  *
-  */
-	function msp_label_recovery_request( $access_request, $response ){
-		$labelRequest = new SimpleXMLElement( '<LabelRecoveryRequest></LabelRecoveryRequest>' );
-
-		$labelRequest->addChild( 'Request' );
-		$labelRequest->Request->addChild( 'TransactionReference' );
-		$labelRequest->Request->TransactionReference->addChild( 'CustomerContext',  $response['Response']['TransactionReference']['CustomerContext'] );
-		$labelRequest->Request->addChild( 'RequestAction',  'LabelRecovery' );
-
-		$labelRequest->addChild( 'LabelSpecification' );
-		$labelRequest->LabelSpecification->addChild( 'LabelImageFormat' );
-		$labelRequest->LabelSpecification->LabelImageFormat->addChild( 'Code', 'GIF' );
-
-		$labelRequest->addChild( 'LabelDelivery' );
-		$labelRequest->LabelDelivery->addChild( 'LabelDelivery' );
-
-		$labelRequest->addChild( 'TrackingNumber', $response['ShipmentResults']['ShipmentIdentificationNumber'] );
-
-		$xml = $access_request->asXML() . $labelRequest->asXML();
-
-		$response = sc_get_xml_by_curl( 'https://'. get_option( 'msp_ups_test_mode' ) .'.ups.com/ups.app/xml/LabelRecovery', $xml );
-
-	}
 }
 
 function base64_to_img( $base64_string, $output_file ) {
@@ -779,6 +773,50 @@ if( ! function_exists( 'msp_ups_create_label' ) ){
 		$label->addChild( 'HTTPUserAgent', $_SERVER['HTTP_USER_AGENT'] );
 
 		return $label;
+	}
+}
+
+if( ! function_exists( 'msp_ups_void_return_xml' ) ){
+  /**
+  *
+  *
+  */
+  function msp_ups_void_return_xml( $return ){
+		$accessRequest = sc_ups_create_access_request_xml();
+		$voidShipmentRequest = msp_ups_create_void_shipment_xml( $return->get_tracking() );
+		$requestXML = $accessRequest->asXML() . $voidShipmentRequest->asXML();
+		$response = sc_get_xml_by_curl( 'https://'. get_option( 'msp_ups_test_mode' ) .'.ups.com/ups.app/xml/Void', $requestXML );
+		if( isset( $response['Status']['StatusCode']['Code'] ) && $response['Status']['StatusCode']['Code'] ){
+			if( $return->can_void_shipment() ){
+				$return->rm_label_dir();
+				$return->destroy();
+			}else{
+				return 'Sorry, you do not have permission to void this shipment.';
+			}
+		}
+	}
+}
+
+if( ! function_exists( 'msp_ups_create_void_shipment_xml' ) ){
+  /**
+  *
+	*
+  *
+  */
+  function msp_ups_create_void_shipment_xml( $tracking ){
+		$username = 'Idk';
+		if( get_current_user_id() ){
+			$user = get_userdata( get_current_user_id() );
+			$username = $user->user_login;
+		}
+
+		$voidShipment = new SimpleXMLElement( '<VoidShipmentRequest></VoidShipmentRequest>' );
+		$voidShipment->addChild( 'Request' );
+		$voidShipment->Request->addChild( 'TransactionReference' );
+		$voidShipment->Request->TransactionReference->addChild( 'CustomerContext', 'Voided by ' . $username  );
+		$voidShipment->Request->addChild( 'RequestAction', '1' );
+		$voidShipment->addChild( 'ShipmentIdentificationNumber', $tracking );
+		return $voidShipment;
 	}
 }
 
@@ -943,29 +981,65 @@ if( ! function_exists( 'msp_create_return_email' ) ){
   * @param array $args - args for the wp_mail function
   *
   */
-  function msp_create_return_email( $returns, $args ){
-    $message = '';
-    $message .= '<h3>Customer: ' . $returns['name'] . ' ' . $returns['email'] . '</h3>';
-		$message .= '<h3>Phone: '. $returns['phone'] .'</h3>';
-    $message .= '<h3>Order #: ' . $returns['order'] . '</h3>';
-    $message .= '<h4>I would like to return...</h4>';
-    $message .= '<table style="border: 1px solid #eee;"><thead><th>SKU</th><th>Name</th><th>Quantity</th><th>Reason</th></thead>';
-    foreach( $returns['items'] as $key => $item ){
-      $message .= '<tr style="border-bottom: 1px solid #eee">';
-      $message .= '<td style="border-right: 1px; padding-right: 15px;">'. $item['sku'] .'</td>';
-      $message .= '<td style="border-right: 1px; padding-right: 15px;">'. $item['name'] .'</td>';
-      $message .= '<td style="border-right: 1px; padding-right: 15px;">'. $item['qty'] .'</td>';
-      $message .= '<td style="border-right: 1px; padding-right: 15px;">'. $item['reason'] .'</td>';
-      $message .= '<tr>';
-    }
-		 $message .= '</table>';
+  function msp_create_return_email( $data, $args = '' ){
+		$return = new MSP_Return( $data['order'] );
+		$user = get_userdata( $return->get_user_id() );
 
-		$headers[]   = 'Reply-To: '. $returns['name'] .' <'. $returns['email'] .'>';
+		$message = '<h2>' . $user->user_login . ' created a return label for order #' . $data['order'] . '</h2>';
+		$message .= '<h3>Items being returned:</h3>';
+		$message .= '<table><th>QTY</th><th>SKU</th><th>NAME</th><th>WEIGHT</th><th>Reason</th>';
+		foreach( $data['items'] as $item ){
+			if( isset( $item['exchange_for'] ) ) $message .= '<th>Exchange For</th>';
+			$message .= '<tr>';
+			foreach( $item as $key => $prop ){
+				if( $key != 'id' && $key != 'exchange_for' ){
+					$message .= '<td style="padding-right: 15px;">'. $prop .'</td>';
+				}
+				if( $key == 'exchange_for' ){
+					$message .= '<td style="padding-right: 15px;">';
+					foreach( $prop as $id => $qty ){
+						$item = wc_get_product( $id );
+						$message .= '<p style="display: block">' . $qty . 'x - ' . $item->get_name() . '</p>';
+					}
+					$message .= '</td>';
+				}
+			}
+			$message .= '</tr>';
+		}
+		$message .= '</table>';
 
-    // echo $message;
+		$message .= '<h3>Return Details:</h3>';
+		$message .= '<p>RMA #: '. $return->get_id() .'</p>';
+		$message .= '<p>TYPE: '. $return->get_type() .'</p>';
+		$message .= '<p>COST: '. $return->get_cost() .'</p>';
+		$message .= '<p>BILLING WEIGHT: '. $return->get_billing_weight() .'</p>';
+		$message .= '<p>CREATED AT: '. $return->get_created() .'</p>';
+		$message .= '<p>TRACKING #: '. $return->get_tracking() .'</p>';
+
+		$message .= '<h2>So what are you gonna do about it?</h2>';
+		$message .= '<p><a href="'. $return->get_view_return_url() .'">View Return</a></p>';
+		$message .= '<p><a href="'. $return->get_label() .'">Get Label</a></p>';
+		$message .= '<p><a href="'. $return->get_receipt() .'">Get Receipt</a></p>';
+		$message .= '<p><a href="'. $return->get_void_shipment_url() .'">Void Return</a></p>';
+
+		$headers[]   = 'Reply-To: '. $user->nicename .' <'. $data['email'] .'>';
+
+		// echo $message;
+
     wp_mail( $args['to'], $args['subject'], $message, $headers );
-    wp_mail( $returns['email'], 'We got your return Request!', '<h2>We got your return Request, expect a response in 1-2 business days.</h2>' );
+		create_customer_return_email( $return, $data['email'] );
   }
+}
+
+if( ! function_exists( 'create_customer_return_email' ) ){
+	function create_customer_return_email( $return, $email ){
+		$message = "<h2>We've got your return label!</h2>";
+		$message .= '<p><a href="'. $return->get_label() .'">Get Label</a></p>';
+		$message .= '<p><a href="'. $return->get_view_return_url() .'">Redo Return</a></p>';
+		$message .= '<p><a href="'. $return->get_void_shipment_url() .'">Void Return</a></p>';
+
+		wp_mail( $email, get_bloginfo('name') . ' - UPS Return Label', $message );
+	}
 }
 
 if( ! function_exists( 'msp_get_return_form_html' ) ){
@@ -1040,7 +1114,7 @@ if( ! function_exists( 'sc_return_item_html' ) ){
   function sc_return_item_html( $order_id ){
 		$return = new MSP_Return( $order_id );
 
-		if( ! $return->exists || get_option( 'msp_ups_test_mode' ) == 'wwwcie' ){
+		if( ! $return->exists ){
 			msp_get_return_button( $order_id );
 		} else {
 			msp_view_return_button( $return );

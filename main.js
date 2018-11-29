@@ -79,12 +79,17 @@ jQuery(document).ready(function( $ ){
 
       $form.on( 'blur', '.exchange_for', function(){
         var total = 0;
+        var str = '';
         $('.exchange_for').each(function(i, obj){
           total += Math.abs(Number(obj.value))
+          str += obj.value + ' - ' + obj.getAttribute('data-qty') + '<br>';
         });
         if( total > qty ){
           $(this).val( 0 );
         }
+        console.log( str );
+
+
         // $('#exchange_header span').html( total + '/' + qty );
       } );
 
@@ -99,23 +104,23 @@ jQuery(document).ready(function( $ ){
   });
 
   function create_exchange_form( id, qty ){
-    // variations = get_item_variations( id );
+    variations = get_item_variations( id );
 
     $exchange_form = $('<div/>', {
       id: id + '_exchange_form',
       class: 'form-group exchange_form',
     });
-    // $table = $('<table/>', {
-    //   id: id + '_variation_table',
-    //   class: 'table'
-    // });
-    // $.each(variations, function(){
-    //   if( this.id != id && this.stock != 0 ){
-    //     $table.append( $('<tr/>').append( '<td>' + this.title + '</td>', '<td><input class="exchange_for" type="tel" name="'+id+'[exchange_for]['+this.id+']/>"</td>' ) );
-    //   }
-    // });
-
-    $exchange_form.append( '<h4 id="exchange_header">Call <a style="color: red;" href="tel:1-888-723-3864">888-723-3864</a> to make an exchange.</h4>' );
+    $table = $('<table/>', {
+      id: id + '_variation_table',
+      class: 'table'
+    });
+    $.each(variations, function(){
+      if( this.id != id && this.stock != 0 ){
+        $table.append( $('<tr/>').append( '<td>' + this.title + '</td>', '<td><input class="exchange_for" type="tel" name="'+id+'[exchange_for]['+this.id+']/>"</td>' ) );
+      }
+    });
+    $exchange_form.append( '<h4>Exchange for what?</h4>', $table );
+    // $exchange_form.append( '<h4 id="exchange_header">Call <a style="color: red;" href="tel:1-888-723-3864">888-723-3864</a> to make an exchange.</h4>' );
     return $exchange_form;
   }
 
@@ -161,7 +166,6 @@ jQuery(document).ready(function( $ ){
     $awnser_box = $( '<div/>' );
     $qty_box = create_label_awnser( id, 'quantity' );
     $reason_box = create_label_awnser( id, 'reason' );
-    $exchange_box = create_label_awnser( id, 'exchange' );
 
     $awnser_box.append( $qty_box, $reason_box );
 
