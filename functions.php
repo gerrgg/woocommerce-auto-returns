@@ -491,6 +491,9 @@ function msp_view_ups_return( $return ){
 			<!-- TODO: add option to include where you contact us page is && LOGO -->
 			<?php echo msp_contact_us(); ?>
 		<?php endif ?>
+		<div class="return-message">
+			<?php echo $return->get_items(); ?>
+		</div>
 		</div>
 	</div>
 	<?php
@@ -574,7 +577,7 @@ if( ! function_exists( 'msp_confirm_return' ) ){
             $returns['items'][$key] = array(
 							'qty' => $item['how_many'],
               'sku' => $product->get_sku(),
-              'name' => $product->get_name(),
+              'name' => wc_get_formatted_variation( $product->get_variation_attributes(), true, false, true ),
               'weight' => $product->get_weight(),
               'reason' => $item['return_reason'],
 							'id' => $key,
@@ -643,10 +646,18 @@ if( ! function_exists( 'msp_shipment_accept_request' ) ){
 function msp_set_return( $response, $data ){
 		global $wpdb;
 		$order = wc_get_order( $data['order'] );
+
+		$return = new MSP_Return( $data['order'] );
+
+		$msg = msp_create_return_email( $data, array(
+			'to' => get_option( 'msp_send_return_email_to' ),
+			'subject' => $data['name'] . ' wants to make a return',
+		) );
+
 		$args = array(
 			'order_id' => $data['order'],
 			'type' => $data['type'],
-			'items' => $data['items'],
+			'items' => $msg,
 			'shipment_cost' => $response['ShipmentResults']['ShipmentCharges']['TotalCharges']['MonetaryValue'],
 			'billing_weight' => $response['ShipmentResults']['BillingWeight']['Weight'],
 			'tracking' => $response['ShipmentResults']['ShipmentIdentificationNumber'],
@@ -659,8 +670,6 @@ function msp_set_return( $response, $data ){
 			$args['label'] = $labels[1];
 			$args['receipt'] = $labels[2];
 		}
-
-		$return = new MSP_Return( $data['order'] );
 
 		if ( ! $return->exists ){
 			$wpdb->insert(
@@ -676,10 +685,6 @@ function msp_set_return( $response, $data ){
 			);
 		}
 
-		msp_create_return_email( $data, array(
-			'to' => get_option( 'msp_send_return_email_to' ),
-			'subject' => $data['name'] . ' wants to make a return',
-		) );
 		$new_return = new MSP_Return( $data['order'] );
 		wp_redirect( $new_return->get_view_return_url() );
 }
@@ -1008,26 +1013,28 @@ if( ! function_exists( 'msp_create_return_email' ) ){
 
 		$message = '<h2>' . $user->user_login . ' created a return label for order #' . $data['order'] . '</h2>';
 		$message .= '<h3>Items being returned:</h3>';
-		$message .= '<table><th>QTY</th><th>SKU</th><th>NAME</th><th>WEIGHT</th><th>Reason</th>';
+		$table = '<table><th>QTY</th><th>SKU</th><th>NAME</th><th>WEIGHT</th><th>Reason</th>';
 		foreach( $data['items'] as $item ){
-			if( isset( $item['exchange_for'] ) ) $message .= '<th>Exchange For</th>';
-			$message .= '<tr>';
+			if( isset( $item['exchange_for'] ) ) $table .= '<th>Exchange For</th>';
+			$table .= '<tr>';
 			foreach( $item as $key => $prop ){
 				if( $key != 'id' && $key != 'exchange_for' ){
-					$message .= '<td style="padding-right: 15px;">'. $prop .'</td>';
+					$table .= '<td style="padding-right: 15px;">'. $prop .'</td>';
 				}
 				if( $key == 'exchange_for' ){
-					$message .= '<td style="padding-right: 15px;">';
+					$table .= '<td style="padding-right: 15px;">';
 					foreach( $prop as $id => $qty ){
 						$item = wc_get_product( $id );
-						$message .= '<p style="display: block">' . $qty . 'x - ' . $item->get_name() . '</p>';
+						$table .= '<p style="display: block">' . $qty . 'x - ' . wc_get_formatted_variation( $item->get_variation_attributes(), true, false, true ) . '</p>';
 					}
-					$message .= '</td>';
+					$table .= '</td>';
 				}
 			}
-			$message .= '</tr>';
+			$table .= '</tr>';
 		}
-		$message .= '</table>';
+		$table .= '</table>';
+
+		$message .= $table;
 
 		$message .= '<h3>Return Details:</h3>';
 		$message .= '<p>RMA #: '. $return->get_id() .'</p>';
@@ -1046,9 +1053,9 @@ if( ! function_exists( 'msp_create_return_email' ) ){
 		$headers[]   = 'Reply-To: '. $user->nicename .' <'. $data['email'] .'>';
 
 		// echo $message;
-
     wp_mail( $args['to'], $args['subject'], $message, $headers );
 		create_customer_return_email( $return, $data['email'] );
+		return $table;
   }
 }
 

@@ -77,6 +77,10 @@ class MSP_Return{
     return $this->data->user_id;
   }
 
+  public function get_items(){
+    return $this->data->items;
+  }
+
   public function is_complete(){
     return $this->data->complete;
   }
