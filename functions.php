@@ -577,7 +577,7 @@ if( ! function_exists( 'msp_confirm_return' ) ){
             $returns['items'][$key] = array(
 							'qty' => $item['how_many'],
               'sku' => $product->get_sku(),
-              'name' => wc_get_formatted_variation( $product->get_variation_attributes(), true, false, true ),
+              'name' => $product->get_name(),
               'weight' => $product->get_weight(),
               'reason' => $item['return_reason'],
 							'id' => $key,
@@ -649,10 +649,7 @@ function msp_set_return( $response, $data ){
 
 		$return = new MSP_Return( $data['order'] );
 
-		$msg = msp_create_return_email( $data, array(
-			'to' => get_option( 'msp_send_return_email_to' ),
-			'subject' => $data['name'] . ' wants to make a return',
-		) );
+		$msg = create_item_table( $data );
 
 		$args = array(
 			'order_id' => $data['order'],
@@ -684,6 +681,11 @@ function msp_set_return( $response, $data ){
 				array( 'order_id' => $args['order_id'] )
 			);
 		}
+
+		msp_create_return_email( $data, array(
+			'to' => get_option( 'msp_send_return_email_to' ),
+			'subject' => $data['name'] . ' wants to make a return',
+		) );
 
 		$new_return = new MSP_Return( $data['order'] );
 		wp_redirect( $new_return->get_view_return_url() );
@@ -1013,28 +1015,8 @@ if( ! function_exists( 'msp_create_return_email' ) ){
 
 		$message = '<h2>' . $user->user_login . ' created a return label for order #' . $data['order'] . '</h2>';
 		$message .= '<h3>Items being returned:</h3>';
-		$table = '<table><th>QTY</th><th>SKU</th><th>NAME</th><th>WEIGHT</th><th>Reason</th>';
-		foreach( $data['items'] as $item ){
-			if( isset( $item['exchange_for'] ) ) $table .= '<th>Exchange For</th>';
-			$table .= '<tr>';
-			foreach( $item as $key => $prop ){
-				if( $key != 'id' && $key != 'exchange_for' ){
-					$table .= '<td style="padding-right: 15px;">'. $prop .'</td>';
-				}
-				if( $key == 'exchange_for' ){
-					$table .= '<td style="padding-right: 15px;">';
-					foreach( $prop as $id => $qty ){
-						$item = wc_get_product( $id );
-						$table .= '<p style="display: block">' . $qty . 'x - ' . wc_get_formatted_variation( $item->get_variation_attributes(), true, false, true ) . '</p>';
-					}
-					$table .= '</td>';
-				}
-			}
-			$table .= '</tr>';
-		}
-		$table .= '</table>';
 
-		$message .= $table;
+		$message .= create_item_table( $data['items'] );;
 
 		$message .= '<h3>Return Details:</h3>';
 		$message .= '<p>RMA #: '. $return->get_id() .'</p>';
@@ -1057,6 +1039,30 @@ if( ! function_exists( 'msp_create_return_email' ) ){
 		create_customer_return_email( $return, $data['email'] );
 		return $table;
   }
+}
+
+function create_item_table( $data ){
+	$table = '<table><th>QTY</th><th>SKU</th><th>NAME</th><th>WEIGHT</th><th>Reason</th>';
+	foreach( $data['items'] as $item ){
+		if( isset( $item['exchange_for'] ) ) $table .= '<th>Exchange For</th>';
+		$table .= '<tr>';
+		foreach( $item as $key => $prop ){
+			if( $key != 'id' && $key != 'exchange_for' ){
+				$table .= '<td style="padding-right: 15px;">'. $prop .'</td>';
+			}
+			if( $key == 'exchange_for' ){
+				$table .= '<td style="padding-right: 15px;">';
+				foreach( $prop as $id => $qty ){
+					$item = wc_get_product( $id );
+					$table .= '<p style="display: block">' . $qty . 'x - ' . wc_get_formatted_variation( $item->get_variation_attributes(), true, false, true ) . '</p>';
+				}
+				$table .= '</td>';
+			}
+		}
+		$table .= '</tr>';
+	}
+	$table .= '</table>';
+	return $table;
 }
 
 if( ! function_exists( 'create_customer_return_email' ) ){
