@@ -681,7 +681,8 @@ function msp_set_return( $response, $data ){
 			'to' => get_option( 'msp_send_return_email_to' ),
 			'subject' => $data['name'] . ' wants to make a return',
 		) );
-		wp_redirect( $new_return->get_view_return_url() );
+		
+		wp_redirect( $return->get_view_return_url() );
 }
 
 function msp_create_digest(){
