@@ -670,8 +670,6 @@ function msp_set_return( $response, $data ){
 			);
 		} else {
 			msp_ups_void_return_xml( $return );
-			// $return->rm_label_dir();
-			// // $return->destroy();
 			$wpdb->update(
 				$wpdb->prefix . 'msp_return',
 				$args,
@@ -683,7 +681,6 @@ function msp_set_return( $response, $data ){
 			'to' => get_option( 'msp_send_return_email_to' ),
 			'subject' => $data['name'] . ' wants to make a return',
 		) );
-		$new_return = new MSP_Return( $data['order'] );
 		wp_redirect( $new_return->get_view_return_url() );
 }
 
@@ -698,7 +695,9 @@ function msp_save_ups_label( $response ){
 	$write_to_url = $upload_dir['baseurl'] . '/returns/' . $order_id . '/';
 	$tracking = $response['ShipmentResults']['ShipmentIdentificationNumber'];
 
-	if( ! file_exists( $write_to ) ) mkdir( $write_to );
+	if( ! file_exists( $write_to ) ){
+		mkdir( $write_to, 0777, true );
+	};
 
 	$base_64_images = array(
 		'label' => $response['ShipmentResults']['PackageResults']['LabelImage']['GraphicImage'],

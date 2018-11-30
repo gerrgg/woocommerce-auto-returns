@@ -99,7 +99,7 @@ class MSP_Return{
     unlink( $path . 'label' . $tracking . '.gif' );
     unlink( $path . 'reciept' . $tracking . '.html' );
     unlink( $path . 'html_image' . $tracking . '.html' );
-    rmdir( $path );
+    // rmdir( $path );
   }
 
   public function get_redo_return_url(){
