@@ -1016,7 +1016,7 @@ if( ! function_exists( 'msp_create_return_email' ) ){
 		$message = '<h2>' . $user->user_login . ' created a return label for order #' . $data['order'] . '</h2>';
 		$message .= '<h3>Items being returned:</h3>';
 
-		$message .= create_item_table( $data['items'] );;
+		$message .= create_item_table( $data );
 
 		$message .= '<h3>Return Details:</h3>';
 		$message .= '<p>RMA #: '. $return->get_id() .'</p>';
