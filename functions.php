@@ -2,7 +2,7 @@
 /*
 Plugin Name: MSP Shipping
 Description: Allows for a website to connect with shipping API's
-Version: 1.1
+Version: 1.2
 Author: Gregory Bastianelli
 Author URI: http://drunk.kiwi
 Text Domain: msp-shipping
@@ -417,10 +417,9 @@ if( ! function_exists( 'msp_return_form_dispatcher' ) ){
       msp_validate_user( $_GET['id'], $_GET['email'] );
     } else if( isset( $_GET['order_id'], $_GET['digest'] ) ){
 			$return = new MSP_Return( $_GET['order_id'] );
-			// pre_dump( $return );
 			if( $return->exists ){
 				if( isset( $_GET['action'], $_GET['id'] ) && $_GET['action'] == 'void'){
-					msp_ups_void_return_xml( $return );
+					msp_ups_void_return_xml( $return, 1 );
 					wp_redirect( '/my-account/orders' );
 				} else {
 					msp_view_ups_return( $return );
@@ -480,7 +479,7 @@ function msp_view_ups_return( $return ){
 			<?php if( ! $return->is_complete() ) : ?>
 			<h3>Actions</h3>
 			<?php if( in_array( 'administrator', (array) $user->roles ) ) : ?>
-				<a href="<?php echo $return->get_receipt()?>" role="button" class="button woocommerce-button button btn-alt">View Receipt</a>
+				<a target='_blank' href="<?php echo $return->get_receipt()?>" role="button" class="button woocommerce-button button btn-alt">View Receipt</a>
 			<?php endif; ?>
 			<a target='_blank' href="<?php echo $return->get_label()?>" role="button" class="button woocommerce-button button btn-success">View Label</a>
 			<a href="<?php echo $return->get_redo_return_url(); ?>" role="button" class="button woocommerce-button btn-info">Redo Return Request</a>
@@ -669,7 +668,7 @@ function msp_set_return( $response, $data ){
 				$args
 			);
 		} else {
-			msp_ups_void_return_xml( $return );
+			msp_ups_void_return_xml( $return, 0 );
 			$wpdb->update(
 				$wpdb->prefix . 'msp_return',
 				$args,
@@ -681,8 +680,8 @@ function msp_set_return( $response, $data ){
 			'to' => get_option( 'msp_send_return_email_to' ),
 			'subject' => $data['name'] . ' wants to make a return',
 		) );
-		
-		wp_redirect( $return->get_view_return_url() );
+		$new_return = new MSP_Return( $data['order'] );
+		wp_redirect( $new_return->get_view_return_url() );
 }
 
 function msp_create_digest(){
@@ -803,7 +802,7 @@ if( ! function_exists( 'msp_ups_void_return_xml' ) ){
   *
   *
   */
-  function msp_ups_void_return_xml( $return ){
+  function msp_ups_void_return_xml( $return, $destroy = 0 ){
 		$accessRequest = sc_ups_create_access_request_xml();
 		$voidShipmentRequest = msp_ups_create_void_shipment_xml( $return->get_tracking() );
 		$requestXML = $accessRequest->asXML() . $voidShipmentRequest->asXML();
@@ -811,7 +810,7 @@ if( ! function_exists( 'msp_ups_void_return_xml' ) ){
 		if( isset( $response['Status']['StatusCode']['Code'] ) && $response['Status']['StatusCode']['Code'] ){
 			if( $return->can_void_shipment() ){
 				$return->rm_label_dir();
-				// $return->destroy();
+				if( $destroy === 1 ) $return->destroy();
 			}else{
 				admin_error( $response );
 			}
