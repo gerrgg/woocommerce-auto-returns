@@ -1,14 +1,18 @@
 .btn-success{
   background-color: green!important;
+  color: #fff!important;
 }
 .btn-alt{
   background-color: teal!important;
+  color: #fff!important;
 }
 .btn-danger{
   background-color: red!important;
+  color: #fff!important;
 }
 .btn-black{
   background-color: #000!important;
+  color: #fff!important;
 }
 
 .exchange_for{

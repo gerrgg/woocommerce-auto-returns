@@ -74,7 +74,7 @@ function get_variations_for_js(){
 			$child = wc_get_product( $child_id );
 			array_push( $variations, array(
 				'id'		=> $child_id,
-				'title' => $child->get_name(),
+				'title' => wc_get_formatted_variation( $child->get_variation_attributes(), true, false, true ),
 				'price' => $child->get_price(),
 				'sku' => $child->get_sku(),
 				'stock' => $child->get_stock_quantity(),
