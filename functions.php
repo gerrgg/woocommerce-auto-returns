@@ -57,6 +57,7 @@ function admin_error( $error = '' ) {
 }
 
 add_action( 'wp_ajax_get_variations_for_js', 'get_variations_for_js' );
+add_action( 'wp_ajax_nopriv_get_variations_for_js', 'get_variations_for_js' );
 function get_variations_for_js(){
 	$variations = array();
 
