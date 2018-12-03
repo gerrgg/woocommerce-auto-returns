@@ -578,7 +578,6 @@ if( ! function_exists( 'msp_confirm_return' ) ){
             $returns['items'][$key] = array(
 							'qty' => $item['how_many'],
               'sku' => $product->get_sku(),
-              'name' => $product->get_name(),
               'weight' => $product->get_weight(),
               'reason' => $item['return_reason'],
 							'id' => $key,
@@ -1043,7 +1042,7 @@ if( ! function_exists( 'msp_create_return_email' ) ){
 }
 
 function create_item_table( $data ){
-	$table = '<table><th>QTY</th><th>SKU</th><th>NAME</th><th>WEIGHT</th><th>Reason</th>';
+	$table = '<table><th>QTY</th><th>SKU</th><th>WEIGHT</th><th>Reason</th>';
 	foreach( $data['items'] as $item ){
 		if( isset( $item['exchange_for'] ) ) $table .= '<th>Exchange For</th>';
 		$table .= '<tr>';
