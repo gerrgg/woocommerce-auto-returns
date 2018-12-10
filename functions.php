@@ -1168,7 +1168,7 @@ function msp_view_return_button( $return ){
 function msp_get_return_button( $order_id ){
 	$order = wc_get_order( $order_id );
 	if( $order->get_status( 'completed' ) ){
-		$delivered = $order->get_date_completed()->modify( '+10 days' );
+		$delivered = $order->get_date_created()->modify( '+10 days' );
 		$return_by = $delivered->modify( '+' . get_option( 'msp_return_by' ) . ' days' );
 
 		$today = new DateTime();
