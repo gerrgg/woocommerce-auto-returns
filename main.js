@@ -67,14 +67,16 @@ jQuery(document).ready(function( $ ){
       } );
 
       $form.on( 'change', '#' + id + '_reason_select', function(){
+        $('#' + id + '_comments_form').remove();
         var awnser = this.value;
         if( awnser.length > 0 && awnser != 'Please select a reason for return' ){
           $('#' + id + '_return_reason').html( awnser );
         }
-        if( awnser == 'I\'d like to make an exchange' && ! $('#' + id + '_exchange_form').length ){
+        if( awnser == 'I would like to make an exchange' && ! $('#' + id + '_exchange_form').length ){
           $form.append( create_exchange_form( id, qty ) );
         } else {
           $('#' + id + '_exchange_form').remove();
+          $form.append( create_comments_form( id ) );
         }
       } );
 
@@ -151,6 +153,19 @@ jQuery(document).ready(function( $ ){
       }
     });
 
+    function create_comments_form( id ){
+      $comments_box = $( '<div/>', {
+        id: id + '_comments_form',
+        class: 'form-group'
+      } );
+      $textarea = $('<textarea/>', {
+        class: 'comments-form',
+        name: id + '[comments]'
+      } );
+      $small = $('<small>Please provide any addtional information for your return, any feedback is extremely helpful and appreciated.</small>');
+      $comments_box.append( '<h4>Additional Details?</h4>', $textarea, $small );
+      return $comments_box;
+    }
 
   function create_confirm_box( id, src ){
     $box = $( '<div/>', {
@@ -208,10 +223,11 @@ jQuery(document).ready(function( $ ){
       'Product and shipping box damaged',
       'Wrong item sent',
       'Received an extra item ( No refund needed )',
-      'Didnt approve purchase'
+      'Didnt approve purchase',
+      'Other'
     ];
 
-    if( type == 'variation' && $exchanges_allowed == 1 ) reasons.splice( 1, 0, 'I\'d like to make an exchange' );
+    if( type == 'variation' && $exchanges_allowed == 1 ) reasons.splice( 1, 0, 'I would like to make an exchange' );
 
     var $select = $( '<select/>', {
       id: id + '_reason_select',

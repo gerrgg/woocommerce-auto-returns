@@ -583,12 +583,13 @@ if( ! function_exists( 'msp_confirm_return' ) ){
 							'id' => $key,
             );
           }
-					if( $item['return_reason'] == "I\'d like to make an exchange" ){
+					if( $item['return_reason'] == "I would like to make an exchange" ){
 						$returns['type'] = 'exchange';
 						foreach( $item['exchange_for'] as $id => $qty ){
-							if( !empty( $qty ) ) $returns['items'][$key]['exchange_for'][$id] = $qty;
+							if( ! empty( $qty ) ) $returns['items'][$key]['exchange_for'][$id] = $qty;
 						}
 					}
+					if( ! empty( $item['comments'] ) ) $returns['items'][$key]['comments'] = $item['comments'];
         }
       }
 			// pre_dump( $_POST );
@@ -1044,7 +1045,8 @@ if( ! function_exists( 'msp_create_return_email' ) ){
 function create_item_table( $data ){
 	$table = '<table><th>QTY</th><th>SKU</th><th>WEIGHT</th><th>Reason</th>';
 	foreach( $data['items'] as $item ){
-		if( isset( $item['exchange_for'] ) ) $table .= '<th>Exchange For</th>';
+		if( isset( $item['exchange_for'] ) ) $table .= '<th>Exchange For Comments</th>';
+		if( isset( $item['comments'] ) ) $table .= '<th>Comments</th>';
 		$table .= '<tr>';
 		foreach( $item as $key => $prop ){
 			if( $key != 'id' && $key != 'exchange_for' ){
