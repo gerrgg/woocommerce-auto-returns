@@ -2,7 +2,7 @@
 /*
 Plugin Name: MSP Shipping
 Description: Allows for a website to connect with shipping API's
-Version: 1.21
+Version: 1.2
 Author: Gregory Bastianelli
 Author URI: http://drunk.kiwi
 Text Domain: msp-shipping
@@ -413,18 +413,18 @@ if( ! function_exists( 'msp_return_form_dispatcher' ) ){
   *
   */
   function msp_return_form_dispatcher(){
-		if( is_user_logged_in() ){
-			wp_redirect( '/my-account/orders' );
-		} else {
 			if( isset( $_GET['id'], $_GET['email'] ) ){
 				msp_validate_user( $_GET['id'], $_GET['email'] );
+				// if there is a digest, check if the return exists
 			} else if( isset( $_GET['order_id'], $_GET['digest'] ) ){
 				$return = new MSP_Return( $_GET['order_id'] );
 				if( $return->exists ){
+					// if the return exists and void is in the url, kill the process
 					if( isset( $_GET['action'], $_GET['id'] ) && $_GET['action'] == 'void'){
 						msp_ups_void_return_xml( $return, 1 );
 						wp_redirect( '/my-account/orders' );
 					} else {
+						// if no void, view the return
 						msp_view_ups_return( $return );
 					}
 				}else{
@@ -435,7 +435,6 @@ if( ! function_exists( 'msp_return_form_dispatcher' ) ){
 			}
 		}
   }
-}
 
 function msp_view_ups_return( $return ){
 	?>
@@ -546,7 +545,7 @@ if( ! function_exists( 'msp_validate_user' ) ){
     } else {
       $order_email = $order->get_billing_email();
       if( $order_email != urldecode( $given_email ) ){
-        msp_non_valid_user_return_form( 'Sorry, ' . urldecode( $given_email ) . ' that is not the email on the order!<p>Give us a call at <a style="text-decoration: underline;" href="tel:8887233864">888-723-3864</a></p>' );
+        msp_non_valid_user_return_form( 'Sorry, ' . urldecode( $given_email ) . ' that is not the email on the order!' );
       } else {
         msp_get_return_form_html( $order );
       }
@@ -1048,8 +1047,7 @@ if( ! function_exists( 'msp_create_return_email' ) ){
 function create_item_table( $data ){
 	$table = '<table><th>QTY</th><th>SKU</th><th>WEIGHT</th><th>Reason</th>';
 	foreach( $data['items'] as $item ){
-		if( isset( $item['exchange_for'] ) ) $table .= '<th>Exchange For Comments</th>';
-		if( isset( $item['comments'] ) ) $table .= '<th>Comments</th>';
+		if( isset( $item['exchange_for'] ) || isset( $item['comments'] ) ) $table .= '<th>Exchange For / Comments</th>';
 		$table .= '<tr>';
 		foreach( $item as $key => $prop ){
 			if( $key != 'id' && $key != 'exchange_for' ){
