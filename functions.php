@@ -2,7 +2,7 @@
 /*
 Plugin Name: MSP Shipping
 Description: Allows for a website to connect with shipping API's
-Version: 1.2
+Version: 1.21
 Author: Gregory Bastianelli
 Author URI: http://drunk.kiwi
 Text Domain: msp-shipping
