@@ -413,24 +413,27 @@ if( ! function_exists( 'msp_return_form_dispatcher' ) ){
   *
   */
   function msp_return_form_dispatcher(){
-		// TODO: UGGGGGGGGGLY
-    if( isset( $_GET['id'], $_GET['email'] ) ){
-      msp_validate_user( $_GET['id'], $_GET['email'] );
-    } else if( isset( $_GET['order_id'], $_GET['digest'] ) ){
-			$return = new MSP_Return( $_GET['order_id'] );
-			if( $return->exists ){
-				if( isset( $_GET['action'], $_GET['id'] ) && $_GET['action'] == 'void'){
-					msp_ups_void_return_xml( $return, 1 );
-					wp_redirect( '/my-account/orders' );
-				} else {
-					msp_view_ups_return( $return );
-				}
-			}else{
-				wp_redirect( '/my-account/orders' );
-			}
+		if( is_user_logged_in() ){
+			wp_redirect( '/my-account/orders' );
 		} else {
-      msp_non_valid_user_return_form();
-    }
+			if( isset( $_GET['id'], $_GET['email'] ) ){
+				msp_validate_user( $_GET['id'], $_GET['email'] );
+			} else if( isset( $_GET['order_id'], $_GET['digest'] ) ){
+				$return = new MSP_Return( $_GET['order_id'] );
+				if( $return->exists ){
+					if( isset( $_GET['action'], $_GET['id'] ) && $_GET['action'] == 'void'){
+						msp_ups_void_return_xml( $return, 1 );
+						wp_redirect( '/my-account/orders' );
+					} else {
+						msp_view_ups_return( $return );
+					}
+				}else{
+					wp_redirect( '/my-account/orders' );
+				}
+			} else {
+				msp_non_valid_user_return_form();
+			}
+		}
   }
 }
 
@@ -514,7 +517,7 @@ if( ! function_exists( 'msp_non_valid_user_return_form' ) ){
     <div class="col-12 text-center">
       <h4 class="danger"><?php echo $error; ?></h4>
       <form class="text-center" method="GET" style="max-width: 450px; margin: auto">
-        <h2>Please log in, or enter the ID and Email attached to the order.</h2>
+        <h2>Please <a style="text-decoration: underline;" href="/my-account/">Login</a>, or enter the ID and Email attached to the order.</h2>
         <div class="form-group">
           <input type="tel" name="id" placeholder="Order ID" />
           <input type="email" name="email" placeholder="youremail@example.com" />
@@ -539,11 +542,11 @@ if( ! function_exists( 'msp_validate_user' ) ){
 
     $order = wc_get_order( $order_id );
     if( empty( $order ) ) {
-      msp_non_valid_user_return_form( 'Sorry, that order does not exist!' );
+      msp_non_valid_user_return_form( 'Sorry, that order does not exist! <p>Give us a call at <a style="text-decoration: underline;" href="tel:8887233864">888-723-3864</a></p>' );
     } else {
       $order_email = $order->get_billing_email();
       if( $order_email != urldecode( $given_email ) ){
-        msp_non_valid_user_return_form( 'Sorry, ' . urldecode( $given_email ) . ' that is not the email on the order!' );
+        msp_non_valid_user_return_form( 'Sorry, ' . urldecode( $given_email ) . ' that is not the email on the order!<p>Give us a call at <a style="text-decoration: underline;" href="tel:8887233864">888-723-3864</a></p>' );
       } else {
         msp_get_return_form_html( $order );
       }
